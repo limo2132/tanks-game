@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Tanks Game</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="screen">
+    <h1>Tanks</h1>
+
+    <section class="panel">
+      <button id="createRoomButton">Create Game</button>
+
+      <div class="join-row">
+        <input id="roomCodeInput" placeholder="Room code" maxlength="4" />
+        <button id="joinRoomButton">Join Game</button>
+      </div>
+
+      <p id="statusText">Create a game or join your friend.</p>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
