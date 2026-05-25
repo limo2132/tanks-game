@@ -1,2 +1,2 @@
 # tanks-game
-Online retro tank capture-the-flag game
+Free Online retro tank capture-the-flag game (Work in progress)
