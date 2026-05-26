@@ -509,16 +509,17 @@ function drawBullet(ctx, x, y) {
 }
 
 function drawExplosion(ctx, explosion) {
-  const age = Date.now() - explosion.createdAt;
+  const age = Math.max(0, Date.now() - explosion.createdAt);
   const progress = Math.min(age / 700, 1);
-  const radius = explosion.size * progress;
+  const radius = Math.max(1, explosion.size * progress);
+  const alpha = Math.max(0, 1 - progress);
 
-  ctx.fillStyle = `rgba(255, 210, 80, ${1 - progress})`;
+  ctx.fillStyle = `rgba(255, 210, 80, ${alpha})`;
   ctx.beginPath();
   ctx.arc(explosion.x, explosion.y, radius, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = `rgba(217, 87, 69, ${1 - progress})`;
+  ctx.fillStyle = `rgba(217, 87, 69, ${alpha})`;
   ctx.beginPath();
   ctx.arc(explosion.x, explosion.y, radius * 0.55, 0, Math.PI * 2);
   ctx.fill();
