@@ -33,11 +33,14 @@
     </section>
 
     <section id="gameScreen" class="game-screen hidden">
-	<div class="game-hud">
-			<strong>Tanks Match</strong>
-			<span id="healthText">Health 200/200</span>
-	<span id="gameRoomText"></span>
+<div class="game-hud">
+  <strong>Tanks Match</strong>
+  <span id="scoreText">Blue 0 - Red 0</span>
+  <span id="healthText">Health 200/200</span>
+  <span id="gameRoomText"></span>
 </div>
+
+<div id="winnerBanner" class="winner-banner hidden"></div>
 
 <div class="battlefield">
   <canvas id="gameCanvas" width="960" height="552"></canvas>

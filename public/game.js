@@ -15,6 +15,8 @@ const lobbyScreen = document.getElementById("lobbyScreen");
 const gameScreen = document.getElementById("gameScreen");
 const gameRoomText = document.getElementById("gameRoomText");
 const healthText = document.getElementById("healthText");
+const scoreText = document.getElementById("scoreText");
+const winnerBanner = document.getElementById("winnerBanner");
 
 let currentRoomCode = null;
 let isReady = false;
@@ -189,6 +191,19 @@ socket.on("roomState", (room) => {
 
   if (healthText) {
     healthText.textContent = `Health ${me.health}/200`;
+  }
+}
+
+if (room.scores && scoreText) {
+  scoreText.textContent = `Blue ${room.scores[1]} - Red ${room.scores[2]}`;
+}
+
+if (winnerBanner) {
+  if (room.winner) {
+    winnerBanner.textContent = room.winner === 1 ? "Blue wins!" : "Red wins!";
+    winnerBanner.classList.remove("hidden");
+  } else {
+    winnerBanner.classList.add("hidden");
   }
 }
 
@@ -555,11 +570,16 @@ if (moveDirection !== 0) {
 }
 
 function gameLoop() {
-  updateLocalTank();
+  const hasWinner = Boolean(latestRoomState?.winner);
+
+  if (!hasWinner) {
+    updateLocalTank();
+  }
 
   const now = Date.now();
 
-  if (now - lastTankSendTime > 33) {
+  if (!hasWinner && now - lastTankSendTime > 33) {
+	  
     socket.emit("tankUpdate", {
       x: localTank.x,
       y: localTank.y,

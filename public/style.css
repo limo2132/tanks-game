@@ -127,6 +127,7 @@ input {
 }
 
 .game-screen {
+  position: relative;
   width: min(960px, 100%);
   height: min(600px, calc(100vh - 48px));
   background: #2f2419;
@@ -176,6 +177,21 @@ input {
   height: 100%;
   image-rendering: pixelated;
   background: #314022;
+}
+
+.winner-banner {
+  position: absolute;
+  z-index: 10;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 14px 22px;
+  background: #1b120d;
+  border: 2px solid #ffd28a;
+  color: #ffd28a;
+  font-size: 28px;
+  font-weight: bold;
+  text-align: center;
 }
 
 .hidden {
