@@ -32,6 +32,16 @@ h1 {
   padding: 24px;
 }
 
+.secondary-button {
+  margin-bottom: 16px;
+  background: #8f6a42;
+  color: #fff3df;
+}
+
+.secondary-button:hover {
+  background: #a77c4f;
+}
+
 button,
 input {
   width: 100%;

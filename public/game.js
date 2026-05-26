@@ -8,6 +8,7 @@ const roomPanel = document.getElementById("roomPanel");
 const roomCodeText = document.getElementById("roomCodeText");
 const playersList = document.getElementById("playersList");
 const readyButton = document.getElementById("readyButton");
+const copyRoomCodeButton = document.getElementById("copyRoomCodeButton");
 const lobbyScreen = document.getElementById("lobbyScreen");
 const gameScreen = document.getElementById("gameScreen");
 const gameRoomText = document.getElementById("gameRoomText");
@@ -122,6 +123,20 @@ joinRoomButton.addEventListener("click", () => {
 
 readyButton.addEventListener("click", () => {
   socket.emit("toggleReady");
+});
+
+copyRoomCodeButton.addEventListener("click", async () => {
+  if (!currentRoomCode) {
+    statusText.textContent = "No room code yet.";
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(currentRoomCode);
+    statusText.textContent = "Room code copied!";
+  } catch {
+    statusText.textContent = `Room code: ${currentRoomCode}`;
+  }
 });
 
 window.addEventListener("keydown", (event) => {
@@ -298,20 +313,21 @@ const playerOne = latestRoomState?.players.find((player) => player.playerNumber 
 const playerTwo = latestRoomState?.players.find((player) => player.playerNumber === 2);
 
 if (myPlayerNumber === 1) {
-  drawTank(ctx, localTank.x, localTank.y, localTank.angle, "#6ca36c");
+  drawTank(ctx, localTank.x, localTank.y, localTank.angle, "#6ca36c", playerOne?.health ?? 200);
 
-  if (playerTwo?.tank) {
-    drawTank(ctx, playerTwo.tank.x, playerTwo.tank.y, playerTwo.tank.angle, "#c95f4a");
+  if (playerTwo?.tank && !playerTwo.respawnAt) {
+    drawTank(ctx, playerTwo.tank.x, playerTwo.tank.y, playerTwo.tank.angle, "#c95f4a", playerTwo.health);
   }
 }
 
 if (myPlayerNumber === 2) {
-  if (playerOne?.tank) {
-    drawTank(ctx, playerOne.tank.x, playerOne.tank.y, playerOne.tank.angle, "#6ca36c");
+  if (playerOne?.tank && !playerOne.respawnAt) {
+    drawTank(ctx, playerOne.tank.x, playerOne.tank.y, playerOne.tank.angle, "#6ca36c", playerOne.health);
   }
 
-  drawTank(ctx, localTank.x, localTank.y, localTank.angle, "#c95f4a");
+  drawTank(ctx, localTank.x, localTank.y, localTank.angle, "#c95f4a", playerTwo?.health ?? 200);
 }
+
 if (latestRoomState?.bullets) {
   latestRoomState.bullets.forEach((bullet) => {
     drawBullet(ctx, bullet.x, bullet.y);
@@ -330,7 +346,7 @@ if (latestRoomState?.bullets) {
   ctx.textAlign = "left";
 }
 
-function drawTank(ctx, x, y, angle, color) {
+function drawTank(ctx, x, y, angle, color, health) {
   ctx.save();
   ctx.translate(x + 19, y + 14);
   ctx.rotate(angle);
@@ -346,6 +362,23 @@ function drawTank(ctx, x, y, angle, color) {
   ctx.fillRect(8, -3, 28, 6);
 
   ctx.restore();
+
+  const healthPercent = Math.max(0, health) / 200;
+  const barWidth = 42;
+  const filledWidth = barWidth * healthPercent;
+
+  ctx.fillStyle = "#1b120d";
+  ctx.fillRect(x - 2, y - 12, barWidth, 6);
+
+  if (health > 140) {
+    ctx.fillStyle = "#7bd86f";
+  } else if (health > 70) {
+    ctx.fillStyle = "#ffd28a";
+  } else {
+    ctx.fillStyle = "#d95745";
+  }
+
+  ctx.fillRect(x - 2, y - 12, filledWidth, 6);
 }
 
 function updateLocalTank() {
