@@ -63,6 +63,61 @@ function getStartingWalls() {
   ];
 }
 
+function getStartingFlags() {
+  return [
+    {
+      owner: 1,
+      x: 111,
+      y: 276,
+      status: "atBase",
+      carrierId: null
+    },
+    {
+      owner: 2,
+      x: 849,
+      y: 276,
+      status: "atBase",
+      carrierId: null
+    }
+  ];
+}
+function getFlagBasePosition(owner) {
+  if (owner === 1) {
+    return {
+      x: 111,
+      y: 276
+    };
+  }
+
+  return {
+    x: 849,
+    y: 276
+  };
+}
+
+function getStartingHeadquarters() {
+  return [
+    {
+      owner: 1,
+      x: 82,
+      y: 238,
+      width: 58,
+      height: 76,
+      health: 250,
+      destroyed: false
+    },
+    {
+      owner: 2,
+      x: 820,
+      y: 238,
+      width: 58,
+      height: 76,
+      health: 250,
+      destroyed: false
+    }
+  ];
+}
+
 function getStartingGates() {
   return [
     {
@@ -130,6 +185,8 @@ players: room.players.map((player) => ({
 bullets: room.bullets,
 gates: room.gates,
 walls: room.walls,
+headquarters: room.headquarters,
+flags: room.flags,
 explosions: room.explosions
   };
 }
@@ -161,6 +218,8 @@ rooms[roomCode] = {
 bullets: [],
 gates: getStartingGates(),
 walls: getStartingWalls(),
+headquarters: getStartingHeadquarters(),
+flags: getStartingFlags(),
 explosions: []
 };
 
@@ -308,6 +367,59 @@ setInterval(() => {
   Object.keys(rooms).forEach((roomCode) => {
     const room = rooms[roomCode];
 	
+	room.flags.forEach((flag) => {
+  if (flag.status !== "carried") {
+    return;
+  }
+
+  const carrier = room.players.find((player) => player.id === flag.carrierId);
+
+  if (!carrier) {
+    return;
+  }
+
+  flag.x = carrier.tank.x + 19;
+  flag.y = carrier.tank.y - 12;
+});
+
+room.players.forEach((player) => {
+  if (player.respawnAt) {
+    return;
+  }
+
+  const playerBox = tankBox(player.tank);
+
+  room.flags.forEach((flag) => {
+    const flagBox = {
+      x: flag.x - 8,
+      y: flag.y - 8,
+      width: 16,
+      height: 16
+    };
+
+    if (!rectanglesOverlap(playerBox, flagBox)) {
+      return;
+    }
+
+    const isOwnFlag = flag.owner === player.playerNumber;
+
+    if (isOwnFlag && flag.status === "dropped") {
+      const basePosition = getFlagBasePosition(flag.owner);
+
+      flag.status = "atBase";
+      flag.carrierId = null;
+      flag.x = basePosition.x;
+      flag.y = basePosition.y;
+      return;
+    }
+
+    if (!isOwnFlag && (flag.status === "atBase" || flag.status === "dropped")) {
+      flag.status = "carried";
+      flag.carrierId = player.id;
+    }
+  });
+});
+	
 room.players.forEach((player) => {
   if (player.respawnAt && now >= player.respawnAt) {
     player.health = 200;
@@ -362,6 +474,32 @@ if (hitWall) {
   return;
 }
 
+const hitHeadquarters = room.headquarters.find((hq) => {
+  if (hq.destroyed) {
+    return false;
+  }
+
+  return rectanglesOverlap(bulletBox(nextBullet), hq);
+});
+
+if (hitHeadquarters) {
+  hitHeadquarters.health -= 17;
+  addExplosion(room, nextBullet.x, nextBullet.y, 18);
+
+  if (hitHeadquarters.health <= 0) {
+    hitHeadquarters.health = 0;
+    hitHeadquarters.destroyed = true;
+    addExplosion(
+      room,
+      hitHeadquarters.x + hitHeadquarters.width / 2,
+      hitHeadquarters.y + hitHeadquarters.height / 2,
+      58
+    );
+  }
+
+  return;
+}
+
 const hitGate = room.gates.find((gate) => {
   if (gate.destroyed) {
     return false;
@@ -399,12 +537,22 @@ if (hitPlayer) {
   hitPlayer.health -= 17;
   addExplosion(room, nextBullet.x, nextBullet.y, 18);
 
-  if (hitPlayer.health <= 0) {
-    hitPlayer.health = 0;
-    addExplosion(room, hitPlayer.tank.x + 19, hitPlayer.tank.y + 14, 54);
-    hitPlayer.respawnAt = now + 3000;
-    hitPlayer.tank = getSpawnForPlayer(hitPlayer.playerNumber);
-  }
+if (hitPlayer.health <= 0) {
+  hitPlayer.health = 0;
+  addExplosion(room, hitPlayer.tank.x + 19, hitPlayer.tank.y + 14, 54);
+
+  room.flags.forEach((flag) => {
+    if (flag.carrierId === hitPlayer.id) {
+      flag.status = "dropped";
+      flag.carrierId = null;
+      flag.x = hitPlayer.tank.x + 19;
+      flag.y = hitPlayer.tank.y + 14;
+    }
+  });
+
+  hitPlayer.respawnAt = now + 3000;
+  hitPlayer.tank = getSpawnForPlayer(hitPlayer.playerNumber);
+}
 
   return;
 }
