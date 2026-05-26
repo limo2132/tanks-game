@@ -28,6 +28,10 @@ const localTank = {
   speed: 2.5,
   turnSpeed: 0.05
 };
+const collisionBlocks = [
+  { x: 34, y: 92, width: 170, height: 368 },
+  { x: 756, y: 92, width: 170, height: 368 }
+];
 
 function setStartingTankPosition() {
   if (myPlayerNumber === 1) {
@@ -146,6 +150,30 @@ socket.on("gameStarting", () => {
   }, 800);
 });
 
+function rectanglesOverlap(a, b) {
+  return (
+    a.x < b.x + b.width &&
+    a.x + a.width > b.x &&
+    a.y < b.y + b.height &&
+    a.y + a.height > b.y
+  );
+}
+
+function tankCollisionBox(x, y) {
+  return {
+    x,
+    y,
+    width: 38,
+    height: 28
+  };
+}
+
+function hitsCollisionBlock(x, y) {
+  const box = tankCollisionBox(x, y);
+
+  return collisionBlocks.some((block) => rectanglesOverlap(box, block));
+}
+
 socket.on("joinError", (message) => {
   statusText.textContent = message;
 });
@@ -263,10 +291,18 @@ function updateLocalTank() {
     moveDirection = -1;
   }
 
-  if (moveDirection !== 0) {
-    localTank.x += Math.cos(localTank.angle) * localTank.speed * moveDirection;
-    localTank.y += Math.sin(localTank.angle) * localTank.speed * moveDirection;
+if (moveDirection !== 0) {
+  const nextX = localTank.x + Math.cos(localTank.angle) * localTank.speed * moveDirection;
+  const nextY = localTank.y + Math.sin(localTank.angle) * localTank.speed * moveDirection;
+
+  if (!hitsCollisionBlock(nextX, localTank.y)) {
+    localTank.x = nextX;
   }
+
+  if (!hitsCollisionBlock(localTank.x, nextY)) {
+    localTank.y = nextY;
+  }
+}
 
   localTank.x = Math.max(0, Math.min(922, localTank.x));
   localTank.y = Math.max(0, Math.min(524, localTank.y));
