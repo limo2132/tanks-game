@@ -17,6 +17,7 @@ let isReady = false;
 let myPlayerNumber = null;
 let latestRoomState = null;
 let lastTankSendTime = 0;
+let lastShotTime = 0;
 
 const keys = {};
 let animationFrameId = null;
@@ -125,6 +126,15 @@ readyButton.addEventListener("click", () => {
 
 window.addEventListener("keydown", (event) => {
   keys[event.key.toLowerCase()] = true;
+
+  if (event.code === "Space") {
+    const now = Date.now();
+
+    if (now - lastShotTime > 600) {
+      socket.emit("shoot");
+      lastShotTime = now;
+    }
+  }
 });
 
 window.addEventListener("keyup", (event) => {
@@ -284,21 +294,6 @@ collisionBlocks.forEach((block) => {
   ctx.fillText("BASE A", 86, 286);
   ctx.fillText("BASE B", 808, 286);
   
-  // base wall highlight
-ctx.strokeStyle = "#c98a42";
-ctx.lineWidth = 3;
-
-collisionBlocks.forEach((block) => {
-  ctx.strokeRect(block.x, block.y, block.width, block.height);
-});
-
-ctx.strokeStyle = "#24150e";
-ctx.lineWidth = 2;
-
-collisionBlocks.forEach((block) => {
-  ctx.strokeRect(block.x + 5, block.y + 5, block.width - 10, block.height - 10);
-});
-
 const playerOne = latestRoomState?.players.find((player) => player.playerNumber === 1);
 const playerTwo = latestRoomState?.players.find((player) => player.playerNumber === 2);
 
@@ -317,7 +312,11 @@ if (myPlayerNumber === 2) {
 
   drawTank(ctx, localTank.x, localTank.y, localTank.angle, "#c95f4a");
 }
-
+if (latestRoomState?.bullets) {
+  latestRoomState.bullets.forEach((bullet) => {
+    drawBullet(ctx, bullet.x, bullet.y);
+  });
+}
   // splash
   ctx.fillStyle = "#ffd28a";
   ctx.font = "bold 34px Arial";
@@ -402,4 +401,15 @@ function gameLoop() {
 
   drawBattlefield();
   animationFrameId = requestAnimationFrame(gameLoop);
+}
+
+function drawBullet(ctx, x, y) {
+  ctx.fillStyle = "#ffd28a";
+  ctx.beginPath();
+  ctx.arc(x, y, 5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "#1b120d";
+  ctx.lineWidth = 2;
+  ctx.stroke();
 }

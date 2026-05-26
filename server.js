@@ -11,6 +11,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static("public"));
 
 const rooms = {};
+let nextBulletId = 1;
 
 function makeRoomCode() {
   return Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -21,15 +22,15 @@ function getRoomState(roomCode) {
 
   return {
     roomCode,
-players: room.players.map((player) => ({
-  id: player.id,
-  playerNumber: player.playerNumber,
-  ready: player.ready,
-  tank: player.tank
-}))
+    players: room.players.map((player) => ({
+      id: player.id,
+      playerNumber: player.playerNumber,
+      ready: player.ready,
+      tank: player.tank
+    })),
+    bullets: room.bullets
   };
 }
-
 io.on("connection", (socket) => {
   console.log("Player connected:", socket.id);
 
@@ -40,19 +41,20 @@ io.on("connection", (socket) => {
       roomCode = makeRoomCode();
     }
 
-    rooms[roomCode] = {
-players: [
-  {
-    id: socket.id,
-    playerNumber: 1,
-    ready: false,
-    tank: {
-      x: 250,
-      y: 276,
-      angle: 0
+rooms[roomCode] = {
+  players: [
+    {
+      id: socket.id,
+      playerNumber: 1,
+      ready: false,
+      tank: {
+        x: 250,
+        y: 276,
+        angle: 0
+      }
     }
-  }
-]
+  ],
+  bullets: []
 };
 
     socket.join(roomCode);
@@ -94,6 +96,33 @@ room.players.push({
     io.to(roomCode).emit("roomState", getRoomState(roomCode));
   });
 
+socket.on("shoot", () => {
+  const roomCode = socket.data.roomCode;
+  const room = rooms[roomCode];
+
+  if (!room) {
+    return;
+  }
+
+  const player = room.players.find((player) => player.id === socket.id);
+
+  if (!player || !player.tank) {
+    return;
+  }
+
+  room.bullets.push({
+    id: nextBulletId,
+    ownerId: socket.id,
+    x: player.tank.x + 19,
+    y: player.tank.y + 14,
+    angle: player.tank.angle,
+    createdAt: Date.now()
+  });
+
+  nextBulletId += 1;
+
+  io.to(roomCode).emit("roomState", getRoomState(roomCode));
+});
 socket.on("tankUpdate", (tank) => {
   const roomCode = socket.data.roomCode;
   const room = rooms[roomCode];
@@ -163,6 +192,34 @@ socket.on("tankUpdate", (tank) => {
     io.to(roomCode).emit("roomState", getRoomState(roomCode));
   });
 });
+
+setInterval(() => {
+  const now = Date.now();
+
+  Object.keys(rooms).forEach((roomCode) => {
+    const room = rooms[roomCode];
+
+    room.bullets = room.bullets
+      .map((bullet) => ({
+        ...bullet,
+        x: bullet.x + Math.cos(bullet.angle) * 16,
+        y: bullet.y + Math.sin(bullet.angle) * 16
+      }))
+      .filter((bullet) => {
+        const isInBounds =
+          bullet.x >= 0 &&
+          bullet.x <= 960 &&
+          bullet.y >= 0 &&
+          bullet.y <= 552;
+
+        const isNotTooOld = now - bullet.createdAt < 1000;
+
+        return isInBounds && isNotTooOld;
+      });
+
+    io.to(roomCode).emit("roomState", getRoomState(roomCode));
+  });
+}, 33);
 
 server.listen(PORT, () => {
   console.log(`Tanks game server running on port ${PORT}`);
