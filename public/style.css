@@ -63,6 +63,45 @@ input {
   margin-top: 16px;
 }
 
+.room-panel {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #405260;
+}
+
+.hidden {
+  display: none;
+}
+
+#roomCodeText {
+  margin: 0 0 12px;
+  color: #d7e3d7;
+  font-weight: bold;
+}
+
+#playersList {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.player-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  background: #0b0f12;
+  border: 1px solid #405260;
+}
+
+.ready {
+  color: #83bd83;
+}
+
+.not-ready {
+  color: #e6b36a;
+}
+
 #statusText {
   min-height: 24px;
   margin: 18px 0 0;
