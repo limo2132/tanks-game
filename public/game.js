@@ -604,6 +604,15 @@ function drawExplosion(ctx, explosion) {
 function drawFlag(ctx, flag) {
   const color = flag.owner === 1 ? "#3f7fd9" : "#c95f4a";
 
+  if (flag.status === "atBase") {
+    ctx.fillStyle = "#1b120d";
+    ctx.fillRect(flag.x - 10, flag.y + 12, 20, 6);
+
+    ctx.strokeStyle = "#ffd28a";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(flag.x - 10, flag.y + 12, 20, 6);
+  }
+
   ctx.strokeStyle = "#1b120d";
   ctx.lineWidth = 3;
   ctx.beginPath();

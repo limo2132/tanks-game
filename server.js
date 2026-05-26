@@ -67,30 +67,31 @@ function getStartingFlags() {
   return [
     {
       owner: 1,
-      x: 111,
+      x: 154,
       y: 276,
       status: "atBase",
       carrierId: null
     },
     {
       owner: 2,
-      x: 849,
+      x: 806,
       y: 276,
       status: "atBase",
       carrierId: null
     }
   ];
 }
+
 function getFlagBasePosition(owner) {
   if (owner === 1) {
     return {
-      x: 111,
+      x: 154,
       y: 276
     };
   }
 
   return {
-    x: 849,
+    x: 806,
     y: 276
   };
 }
@@ -187,6 +188,8 @@ gates: room.gates,
 walls: room.walls,
 headquarters: room.headquarters,
 flags: room.flags,
+scores: room.scores,
+winner: room.winner,
 explosions: room.explosions
   };
 }
@@ -220,6 +223,11 @@ gates: getStartingGates(),
 walls: getStartingWalls(),
 headquarters: getStartingHeadquarters(),
 flags: getStartingFlags(),
+scores: {
+  1: 0,
+  2: 0
+},
+winner: null,
 explosions: []
 };
 
@@ -418,6 +426,55 @@ room.players.forEach((player) => {
       flag.carrierId = player.id;
     }
   });
+});
+
+room.players.forEach((player) => {
+  if (player.respawnAt || room.winner) {
+    return;
+  }
+
+  const carriedEnemyFlag = room.flags.find((flag) => {
+    return flag.carrierId === player.id && flag.owner !== player.playerNumber;
+  });
+
+  if (!carriedEnemyFlag) {
+    return;
+  }
+
+  const ownFlag = room.flags.find((flag) => flag.owner === player.playerNumber);
+
+  if (!ownFlag || ownFlag.status !== "atBase") {
+    return;
+  }
+
+  const ownFlagBase = getFlagBasePosition(player.playerNumber);
+
+const ownCaptureZone = {
+  x: ownFlagBase.x - 18,
+  y: ownFlagBase.y - 18,
+  width: 36,
+  height: 36
+};
+
+const playerBox = tankBox(player.tank);
+
+if (!rectanglesOverlap(playerBox, ownCaptureZone)) {
+  return;
+}
+
+  room.scores[player.playerNumber] += 1;
+
+  const enemyFlagBase = getFlagBasePosition(carriedEnemyFlag.owner);
+  carriedEnemyFlag.status = "atBase";
+  carriedEnemyFlag.carrierId = null;
+  carriedEnemyFlag.x = enemyFlagBase.x;
+  carriedEnemyFlag.y = enemyFlagBase.y;
+
+  addExplosion(room, ownFlagBase.x, ownFlagBase.y, 42);
+
+  if (room.scores[player.playerNumber] >= 3) {
+    room.winner = player.playerNumber;
+  }
 });
 	
 room.players.forEach((player) => {
