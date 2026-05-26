@@ -221,6 +221,14 @@ function drawBattlefield() {
   ctx.font = "bold 18px Arial";
   ctx.fillText("BASE A", 86, 286);
   ctx.fillText("BASE B", 808, 286);
+  
+  // debug collision boxes
+ctx.strokeStyle = "#ff3333";
+ctx.lineWidth = 2;
+
+collisionBlocks.forEach((block) => {
+  ctx.strokeRect(block.x, block.y, block.width, block.height);
+});
 
 const playerOne = latestRoomState?.players.find((player) => player.playerNumber === 1);
 const playerTwo = latestRoomState?.players.find((player) => player.playerNumber === 2);
