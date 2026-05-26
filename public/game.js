@@ -1,6 +1,7 @@
 const socket = io();
 
 const createRoomButton = document.getElementById("createRoomButton");
+const lobbyActions = document.getElementById("lobbyActions");
 const joinRoomButton = document.getElementById("joinRoomButton");
 const roomCodeInput = document.getElementById("roomCodeInput");
 const statusText = document.getElementById("statusText");
@@ -8,10 +9,12 @@ const roomPanel = document.getElementById("roomPanel");
 const roomCodeText = document.getElementById("roomCodeText");
 const playersList = document.getElementById("playersList");
 const readyButton = document.getElementById("readyButton");
+const backButton = document.getElementById("backButton");
 const copyRoomCodeButton = document.getElementById("copyRoomCodeButton");
 const lobbyScreen = document.getElementById("lobbyScreen");
 const gameScreen = document.getElementById("gameScreen");
 const gameRoomText = document.getElementById("gameRoomText");
+const healthText = document.getElementById("healthText");
 
 let currentRoomCode = null;
 let isReady = false;
@@ -80,6 +83,7 @@ function setStartingTankPosition() {
 
 function showRoomPanel(roomCode) {
   currentRoomCode = roomCode;
+  lobbyActions.classList.add("hidden");
   roomPanel.classList.remove("hidden");
   roomCodeText.textContent = `Room code: ${roomCode}`;
 }
@@ -125,6 +129,9 @@ readyButton.addEventListener("click", () => {
   socket.emit("toggleReady");
 });
 
+backButton.addEventListener("click", () => {
+  window.location.reload();
+});
 copyRoomCodeButton.addEventListener("click", async () => {
   if (!currentRoomCode) {
     statusText.textContent = "No room code yet.";
@@ -176,10 +183,14 @@ socket.on("roomState", (room) => {
   const me = room.players.find((player) => player.id === socket.id);
 
   if (me) {
-    isReady = me.ready;
-    myPlayerNumber = me.playerNumber;
-    readyButton.textContent = isReady ? "Not Ready" : "Ready";
+  isReady = me.ready;
+  myPlayerNumber = me.playerNumber;
+  readyButton.textContent = isReady ? "Not Ready" : "Ready";
+
+  if (healthText) {
+    healthText.textContent = `Health ${me.health}/200`;
   }
+}
 
   if (room.players.length < 2) {
     statusText.textContent = "Waiting for second player...";
