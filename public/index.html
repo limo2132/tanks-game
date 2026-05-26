@@ -7,23 +7,37 @@
 </head>
 <body>
   <main class="screen">
-    <h1>Tanks</h1>
+    <section id="lobbyScreen">
+      <h1>Tanks</h1>
 
-    <section class="panel">
-      <button id="createRoomButton">Create Game</button>
+      <section class="panel">
+        <button id="createRoomButton">Create Game</button>
 
-      <div class="join-row">
-        <input id="roomCodeInput" placeholder="Room code" maxlength="4" />
-        <button id="joinRoomButton">Join Game</button>
+        <div class="join-row">
+          <input id="roomCodeInput" placeholder="Room code" maxlength="4" />
+          <button id="joinRoomButton">Join Game</button>
+        </div>
+
+        <div id="roomPanel" class="room-panel hidden">
+          <p id="roomCodeText"></p>
+          <div id="playersList"></div>
+          <button id="readyButton">Ready</button>
+        </div>
+
+        <p id="statusText">Create a game or join your friend.</p>
+      </section>
+    </section>
+
+    <section id="gameScreen" class="game-screen hidden">
+      <div class="game-hud">
+        <strong>Tanks Match</strong>
+        <span id="gameRoomText"></span>
       </div>
 
-      <div id="roomPanel" class="room-panel hidden">
-        <p id="roomCodeText"></p>
-        <div id="playersList"></div>
-        <button id="readyButton">Ready</button>
+      <div class="game-placeholder">
+        <h2>Game Started</h2>
+        <p>Player 1 vs Player 2</p>
       </div>
-
-      <p id="statusText">Create a game or join your friend.</p>
     </section>
   </main>
 

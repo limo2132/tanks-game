@@ -8,6 +8,9 @@ const roomPanel = document.getElementById("roomPanel");
 const roomCodeText = document.getElementById("roomCodeText");
 const playersList = document.getElementById("playersList");
 const readyButton = document.getElementById("readyButton");
+const lobbyScreen = document.getElementById("lobbyScreen");
+const gameScreen = document.getElementById("gameScreen");
+const gameRoomText = document.getElementById("gameRoomText");
 
 let currentRoomCode = null;
 let isReady = false;
@@ -92,6 +95,12 @@ socket.on("roomState", (room) => {
 socket.on("gameStarting", () => {
   statusText.textContent = "Both players ready. Game starting...";
   readyButton.disabled = true;
+
+  setTimeout(() => {
+    lobbyScreen.classList.add("hidden");
+    gameScreen.classList.remove("hidden");
+    gameRoomText.textContent = `Room ${currentRoomCode}`;
+  }, 800);
 });
 
 socket.on("joinError", (message) => {
