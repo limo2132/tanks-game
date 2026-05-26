@@ -29,8 +29,37 @@ const localTank = {
   turnSpeed: 0.05
 };
 const collisionBlocks = [
-  { x: 34, y: 92, width: 170, height: 368 },
-  { x: 756, y: 92, width: 170, height: 368 }
+  // left base walls
+  { x: 34, y: 92, width: 190, height: 24 },
+  { x: 34, y: 436, width: 190, height: 24 },
+  { x: 34, y: 92, width: 24, height: 368 },
+  { x: 200, y: 92, width: 24, height: 130 },
+  { x: 200, y: 330, width: 24, height: 130 },
+
+  // right base walls
+  { x: 736, y: 92, width: 190, height: 24 },
+  { x: 736, y: 436, width: 190, height: 24 },
+  { x: 902, y: 92, width: 24, height: 368 },
+  { x: 736, y: 92, width: 24, height: 130 },
+  { x: 736, y: 330, width: 24, height: 130 }
+];
+const gateBlocks = [
+  {
+    x: 200,
+    y: 222,
+    width: 24,
+    height: 108,
+    owner: 1,
+    health: 100
+  },
+  {
+    x: 736,
+    y: 222,
+    width: 24,
+    height: 108,
+    owner: 2,
+    health: 100
+  }
 ];
 
 function setStartingTankPosition() {
@@ -171,7 +200,22 @@ function tankCollisionBox(x, y) {
 function hitsCollisionBlock(x, y) {
   const box = tankCollisionBox(x, y);
 
-  return collisionBlocks.some((block) => rectanglesOverlap(box, block));
+  const hitsWall = collisionBlocks.some((block) => rectanglesOverlap(box, block));
+
+  const hitsEnemyGate = gateBlocks.some((gate) => {
+    const isOwnGate = gate.owner === myPlayerNumber;
+
+    return !isOwnGate && rectanglesOverlap(box, gate);
+  });
+
+  const opponent = latestRoomState?.players.find((player) => {
+    return player.playerNumber !== myPlayerNumber;
+  });
+
+  const hitsOpponent =
+    opponent?.tank && rectanglesOverlap(box, tankCollisionBox(opponent.tank.x, opponent.tank.y));
+
+  return hitsWall || hitsEnemyGate || hitsOpponent;
 }
 
 socket.on("joinError", (message) => {
@@ -202,19 +246,37 @@ function drawBattlefield() {
     ctx.fillRect(x + 18, 276, 28, 6);
   }
 
-  // left base
-  ctx.fillStyle = "#433326";
-  ctx.fillRect(34, 92, 170, 368);
-  ctx.strokeStyle = "#9b6a3a";
-  ctx.lineWidth = 8;
-  ctx.strokeRect(34, 92, 170, 368);
+// base floors
+ctx.fillStyle = "#433326";
+ctx.fillRect(34, 92, 190, 368);
+ctx.fillRect(736, 92, 190, 368);
 
-  // right base
-  ctx.fillStyle = "#433326";
-  ctx.fillRect(756, 92, 170, 368);
-  ctx.strokeStyle = "#9b6a3a";
-  ctx.lineWidth = 8;
-  ctx.strokeRect(756, 92, 170, 368);
+// base gates
+gateBlocks.forEach((gate) => {
+  const isOwnGate = gate.owner === myPlayerNumber;
+
+  ctx.fillStyle = isOwnGate ? "#2f6f4e" : "#8b3f2f";
+  ctx.fillRect(gate.x, gate.y, gate.width, gate.height);
+
+  ctx.strokeStyle = isOwnGate ? "#77d09a" : "#d9973f";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(gate.x, gate.y, gate.width, gate.height);
+});
+
+// base wall highlight
+ctx.strokeStyle = "#c98a42";
+ctx.lineWidth = 3;
+
+collisionBlocks.forEach((block) => {
+  ctx.strokeRect(block.x, block.y, block.width, block.height);
+});
+
+ctx.strokeStyle = "#24150e";
+ctx.lineWidth = 2;
+
+collisionBlocks.forEach((block) => {
+  ctx.strokeRect(block.x + 5, block.y + 5, block.width - 10, block.height - 10);
+});
 
   // labels
   ctx.fillStyle = "#ffd28a";
@@ -222,12 +284,19 @@ function drawBattlefield() {
   ctx.fillText("BASE A", 86, 286);
   ctx.fillText("BASE B", 808, 286);
   
-  // debug collision boxes
-ctx.strokeStyle = "#ff3333";
-ctx.lineWidth = 2;
+  // base wall highlight
+ctx.strokeStyle = "#c98a42";
+ctx.lineWidth = 3;
 
 collisionBlocks.forEach((block) => {
   ctx.strokeRect(block.x, block.y, block.width, block.height);
+});
+
+ctx.strokeStyle = "#24150e";
+ctx.lineWidth = 2;
+
+collisionBlocks.forEach((block) => {
+  ctx.strokeRect(block.x + 5, block.y + 5, block.width - 10, block.height - 10);
 });
 
 const playerOne = latestRoomState?.players.find((player) => player.playerNumber === 1);
