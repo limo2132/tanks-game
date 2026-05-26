@@ -12,6 +12,7 @@ app.use(express.static("public"));
 
 const rooms = {};
 let nextBulletId = 1;
+let nextExplosionId = 1;
 
 function makeRoomCode() {
   return Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -44,6 +45,59 @@ function rectanglesOverlap(a, b) {
   );
 }
 
+function getStartingWalls() {
+  return [
+    // left base walls
+    { x: 34, y: 92, width: 190, height: 24, health: 150, destroyed: false },
+    { x: 34, y: 436, width: 190, height: 24, health: 150, destroyed: false },
+    { x: 34, y: 92, width: 24, height: 368, health: 150, destroyed: false },
+    { x: 200, y: 92, width: 24, height: 130, health: 150, destroyed: false },
+    { x: 200, y: 330, width: 24, height: 130, health: 150, destroyed: false },
+
+    // right base walls
+    { x: 736, y: 92, width: 190, height: 24, health: 150, destroyed: false },
+    { x: 736, y: 436, width: 190, height: 24, health: 150, destroyed: false },
+    { x: 902, y: 92, width: 24, height: 368, health: 150, destroyed: false },
+    { x: 736, y: 92, width: 24, height: 130, health: 150, destroyed: false },
+    { x: 736, y: 330, width: 24, height: 130, health: 150, destroyed: false }
+  ];
+}
+
+function getStartingGates() {
+  return [
+    {
+      x: 200,
+      y: 222,
+      width: 24,
+      height: 108,
+      owner: 1,
+      health: 100,
+      destroyed: false
+    },
+    {
+      x: 736,
+      y: 222,
+      width: 24,
+      height: 108,
+      owner: 2,
+      health: 100,
+      destroyed: false
+    }
+  ];
+}
+
+function addExplosion(room, x, y, size) {
+  room.explosions.push({
+    id: nextExplosionId,
+    x,
+    y,
+    size,
+    createdAt: Date.now()
+  });
+
+  nextExplosionId += 1;
+}
+
 function getSpawnForPlayer(playerNumber) {
   if (playerNumber === 1) {
     return {
@@ -73,7 +127,10 @@ players: room.players.map((player) => ({
   respawnAt: player.respawnAt,
   tank: player.tank
 })),
-    bullets: room.bullets
+bullets: room.bullets,
+gates: room.gates,
+walls: room.walls,
+explosions: room.explosions
   };
 }
 io.on("connection", (socket) => {
@@ -88,20 +145,23 @@ io.on("connection", (socket) => {
 
 rooms[roomCode] = {
   players: [
-{
-  id: socket.id,
-  playerNumber: 1,
-  ready: false,
-  health: 200,
-  respawnAt: null,
-  tank: {
-    x: 250,
-    y: 276,
-    angle: 0
-  }
-}
+    {
+      id: socket.id,
+      playerNumber: 1,
+      ready: false,
+      health: 200,
+      respawnAt: null,
+      tank: {
+        x: 250,
+        y: 276,
+        angle: 0
+      }
+    }
   ],
-  bullets: []
+bullets: [],
+gates: getStartingGates(),
+walls: getStartingWalls(),
+explosions: []
 };
 
     socket.join(roomCode);
@@ -256,6 +316,10 @@ room.players.forEach((player) => {
   }
 });
 
+room.explosions = room.explosions.filter((explosion) => {
+  return now - explosion.createdAt < 700;
+});
+
 const nextBullets = [];
 
 room.bullets.forEach((bullet) => {
@@ -277,6 +341,48 @@ room.bullets.forEach((bullet) => {
     return;
   }
 
+const hitWall = room.walls.find((wall) => {
+  if (wall.destroyed) {
+    return false;
+  }
+
+  return rectanglesOverlap(bulletBox(nextBullet), wall);
+});
+
+if (hitWall) {
+  hitWall.health -= 17;
+  addExplosion(room, nextBullet.x, nextBullet.y, 18);
+
+  if (hitWall.health <= 0) {
+    hitWall.health = 0;
+    hitWall.destroyed = true;
+    addExplosion(room, hitWall.x + hitWall.width / 2, hitWall.y + hitWall.height / 2, 42);
+  }
+
+  return;
+}
+
+const hitGate = room.gates.find((gate) => {
+  if (gate.destroyed) {
+    return false;
+  }
+
+  return rectanglesOverlap(bulletBox(nextBullet), gate);
+});
+
+if (hitGate) {
+  hitGate.health -= 17;
+  addExplosion(room, nextBullet.x, nextBullet.y, 18);
+
+  if (hitGate.health <= 0) {
+    hitGate.health = 0;
+    hitGate.destroyed = true;
+    addExplosion(room, hitGate.x + hitGate.width / 2, hitGate.y + hitGate.height / 2, 42);
+  }
+
+  return;
+}
+
   const hitPlayer = room.players.find((player) => {
     if (player.id === nextBullet.ownerId) {
       return false;
@@ -289,17 +395,19 @@ room.bullets.forEach((bullet) => {
     return rectanglesOverlap(bulletBox(nextBullet), tankBox(player.tank));
   });
 
-  if (hitPlayer) {
-    hitPlayer.health -= 17;
+if (hitPlayer) {
+  hitPlayer.health -= 17;
+  addExplosion(room, nextBullet.x, nextBullet.y, 18);
 
-    if (hitPlayer.health <= 0) {
-      hitPlayer.health = 0;
-      hitPlayer.respawnAt = now + 3000;
-      hitPlayer.tank = getSpawnForPlayer(hitPlayer.playerNumber);
-    }
-
-    return;
+  if (hitPlayer.health <= 0) {
+    hitPlayer.health = 0;
+    addExplosion(room, hitPlayer.tank.x + 19, hitPlayer.tank.y + 14, 54);
+    hitPlayer.respawnAt = now + 3000;
+    hitPlayer.tank = getSpawnForPlayer(hitPlayer.playerNumber);
   }
+
+  return;
+}
 
   nextBullets.push(nextBullet);
 });

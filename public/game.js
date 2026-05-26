@@ -225,13 +225,19 @@ function tankCollisionBox(x, y) {
 function hitsCollisionBlock(x, y) {
   const box = tankCollisionBox(x, y);
 
-  const hitsWall = collisionBlocks.some((block) => rectanglesOverlap(box, block));
+const currentWalls = latestRoomState?.walls || collisionBlocks;
 
-  const hitsEnemyGate = gateBlocks.some((gate) => {
-    const isOwnGate = gate.owner === myPlayerNumber;
+const hitsWall = currentWalls.some((wall) => {
+  return !wall.destroyed && rectanglesOverlap(box, wall);
+});
 
-    return !isOwnGate && rectanglesOverlap(box, gate);
-  });
+const currentGates = latestRoomState?.gates || gateBlocks;
+
+const hitsEnemyGate = currentGates.some((gate) => {
+  const isOwnGate = gate.owner === myPlayerNumber;
+
+  return !gate.destroyed && !isOwnGate && rectanglesOverlap(box, gate);
+});
 
   const opponent = latestRoomState?.players.find((player) => {
     return player.playerNumber !== myPlayerNumber;
@@ -277,8 +283,15 @@ ctx.fillRect(34, 92, 190, 368);
 ctx.fillRect(736, 92, 190, 368);
 
 // base gates
-gateBlocks.forEach((gate) => {
+const currentGates = latestRoomState?.gates || gateBlocks;
+
+currentGates.forEach((gate) => {
+  if (gate.destroyed) {
+    return;
+  }
+
   const isOwnGate = gate.owner === myPlayerNumber;
+  const healthPercent = gate.health / 100;
 
   ctx.fillStyle = isOwnGate ? "#2f6f4e" : "#8b3f2f";
   ctx.fillRect(gate.x, gate.y, gate.width, gate.height);
@@ -286,21 +299,23 @@ gateBlocks.forEach((gate) => {
   ctx.strokeStyle = isOwnGate ? "#77d09a" : "#d9973f";
   ctx.lineWidth = 3;
   ctx.strokeRect(gate.x, gate.y, gate.width, gate.height);
+
+  ctx.fillStyle = "#1b120d";
+  ctx.fillRect(gate.x - 8, gate.y - 10, gate.width + 16, 5);
+
+  ctx.fillStyle = "#ffd28a";
+  ctx.fillRect(gate.x - 8, gate.y - 10, (gate.width + 16) * healthPercent, 5);
 });
 
-// base wall highlight
-ctx.strokeStyle = "#c98a42";
-ctx.lineWidth = 3;
+// base walls
+const currentWalls = latestRoomState?.walls || collisionBlocks;
 
-collisionBlocks.forEach((block) => {
-  ctx.strokeRect(block.x, block.y, block.width, block.height);
-});
+currentWalls.forEach((wall) => {
+  if (wall.destroyed) {
+    return;
+  }
 
-ctx.strokeStyle = "#24150e";
-ctx.lineWidth = 2;
-
-collisionBlocks.forEach((block) => {
-  ctx.strokeRect(block.x + 5, block.y + 5, block.width - 10, block.height - 10);
+  drawWall(ctx, wall);
 });
 
   // labels
@@ -333,6 +348,13 @@ if (latestRoomState?.bullets) {
     drawBullet(ctx, bullet.x, bullet.y);
   });
 }
+
+if (latestRoomState?.explosions) {
+  latestRoomState.explosions.forEach((explosion) => {
+    drawExplosion(ctx, explosion);
+  });
+}
+
   // splash
   ctx.fillStyle = "#ffd28a";
   ctx.font = "bold 34px Arial";
@@ -344,6 +366,45 @@ if (latestRoomState?.bullets) {
   ctx.fillText("Capture the enemy flag", canvas.width / 2, 86);
 
   ctx.textAlign = "left";
+}
+
+function drawWall(ctx, wall) {
+  ctx.fillStyle = "#6f5944";
+  ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+
+  ctx.strokeStyle = "#c98a42";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(wall.x, wall.y, wall.width, wall.height);
+
+  ctx.strokeStyle = "#24150e";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(wall.x + 5, wall.y + 5, wall.width - 10, wall.height - 10);
+
+  if (wall.health < 150) {
+    const healthPercent = wall.health / 150;
+
+    ctx.fillStyle = "#1b120d";
+    ctx.fillRect(wall.x, wall.y - 8, wall.width, 5);
+
+    ctx.fillStyle = "#ffd28a";
+    ctx.fillRect(wall.x, wall.y - 8, wall.width * healthPercent, 5);
+  }
+
+  if (wall.health < 100) {
+    ctx.strokeStyle = "#24150e";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(wall.x + 6, wall.y + 6);
+    ctx.lineTo(wall.x + wall.width - 8, wall.y + wall.height - 8);
+    ctx.stroke();
+  }
+
+  if (wall.health < 50) {
+    ctx.beginPath();
+    ctx.moveTo(wall.x + wall.width - 8, wall.y + 7);
+    ctx.lineTo(wall.x + 8, wall.y + wall.height - 7);
+    ctx.stroke();
+  }
 }
 
 function drawTank(ctx, x, y, angle, color, health) {
@@ -445,4 +506,20 @@ function drawBullet(ctx, x, y) {
   ctx.strokeStyle = "#1b120d";
   ctx.lineWidth = 2;
   ctx.stroke();
+}
+
+function drawExplosion(ctx, explosion) {
+  const age = Date.now() - explosion.createdAt;
+  const progress = Math.min(age / 700, 1);
+  const radius = explosion.size * progress;
+
+  ctx.fillStyle = `rgba(255, 210, 80, ${1 - progress})`;
+  ctx.beginPath();
+  ctx.arc(explosion.x, explosion.y, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = `rgba(217, 87, 69, ${1 - progress})`;
+  ctx.beginPath();
+  ctx.arc(explosion.x, explosion.y, radius * 0.55, 0, Math.PI * 2);
+  ctx.fill();
 }
