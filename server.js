@@ -21,10 +21,12 @@ function getRoomState(roomCode) {
 
   return {
     roomCode,
-    players: room.players.map((player) => ({
-      id: player.id,
-      ready: player.ready
-    }))
+players: room.players.map((player) => ({
+  id: player.id,
+  playerNumber: player.playerNumber,
+  ready: player.ready,
+  tank: player.tank
+}))
   };
 }
 
@@ -39,13 +41,19 @@ io.on("connection", (socket) => {
     }
 
     rooms[roomCode] = {
-      players: [
-        {
-          id: socket.id,
-          ready: false
-        }
-      ]
-    };
+players: [
+  {
+    id: socket.id,
+    playerNumber: 1,
+    ready: false,
+    tank: {
+      x: 250,
+      y: 276,
+      angle: 0
+    }
+  }
+]
+};
 
     socket.join(roomCode);
     socket.data.roomCode = roomCode;
@@ -68,10 +76,16 @@ io.on("connection", (socket) => {
       return;
     }
 
-    room.players.push({
-      id: socket.id,
-      ready: false
-    });
+room.players.push({
+  id: socket.id,
+  playerNumber: 2,
+  ready: false,
+  tank: {
+    x: 672,
+    y: 276,
+    angle: Math.PI
+  }
+});
 
     socket.join(roomCode);
     socket.data.roomCode = roomCode;
@@ -79,6 +93,29 @@ io.on("connection", (socket) => {
     io.to(roomCode).emit("bothPlayersJoined", roomCode);
     io.to(roomCode).emit("roomState", getRoomState(roomCode));
   });
+
+socket.on("tankUpdate", (tank) => {
+  const roomCode = socket.data.roomCode;
+  const room = rooms[roomCode];
+
+  if (!room) {
+    return;
+  }
+
+  const player = room.players.find((player) => player.id === socket.id);
+
+  if (!player) {
+    return;
+  }
+
+  player.tank = {
+    x: tank.x,
+    y: tank.y,
+    angle: tank.angle
+  };
+
+  io.to(roomCode).emit("roomState", getRoomState(roomCode));
+});
 
   socket.on("toggleReady", () => {
     const roomCode = socket.data.roomCode;

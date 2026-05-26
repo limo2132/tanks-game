@@ -14,6 +14,34 @@ const gameRoomText = document.getElementById("gameRoomText");
 
 let currentRoomCode = null;
 let isReady = false;
+let myPlayerNumber = null;
+let latestRoomState = null;
+let lastTankSendTime = 0;
+
+const keys = {};
+let animationFrameId = null;
+
+const localTank = {
+  x: 250,
+  y: 276,
+  angle: 0,
+  speed: 2.5,
+  turnSpeed: 0.05
+};
+
+function setStartingTankPosition() {
+  if (myPlayerNumber === 1) {
+    localTank.x = 250;
+    localTank.y = 276;
+    localTank.angle = 0;
+  }
+
+  if (myPlayerNumber === 2) {
+    localTank.x = 672;
+    localTank.y = 276;
+    localTank.angle = Math.PI;
+  }
+}
 
 function showRoomPanel(roomCode) {
   currentRoomCode = roomCode;
@@ -62,6 +90,14 @@ readyButton.addEventListener("click", () => {
   socket.emit("toggleReady");
 });
 
+window.addEventListener("keydown", (event) => {
+  keys[event.key.toLowerCase()] = true;
+});
+
+window.addEventListener("keyup", (event) => {
+  keys[event.key.toLowerCase()] = false;
+});
+
 socket.on("roomCreated", (roomCode) => {
   isReady = false;
   readyButton.textContent = "Ready";
@@ -75,6 +111,7 @@ socket.on("bothPlayersJoined", (roomCode) => {
 });
 
 socket.on("roomState", (room) => {
+  latestRoomState = room;
   showRoomPanel(room.roomCode);
   renderPlayers(room.players);
 
@@ -82,6 +119,7 @@ socket.on("roomState", (room) => {
 
   if (me) {
     isReady = me.ready;
+    myPlayerNumber = me.playerNumber;
     readyButton.textContent = isReady ? "Not Ready" : "Ready";
   }
 
@@ -100,7 +138,11 @@ socket.on("gameStarting", () => {
     lobbyScreen.classList.add("hidden");
     gameScreen.classList.remove("hidden");
     gameRoomText.textContent = `Room ${currentRoomCode}`;
-    drawBattlefield();
+	setStartingTankPosition();
+		
+	if (!animationFrameId) {
+	gameLoop();
+	}
   }, 800);
 });
 
@@ -152,11 +194,24 @@ function drawBattlefield() {
   ctx.fillText("BASE A", 86, 286);
   ctx.fillText("BASE B", 808, 286);
 
-  // player 1 tank
-  drawTank(ctx, 250, 276, "#6ca36c", "right");
+const playerOne = latestRoomState?.players.find((player) => player.playerNumber === 1);
+const playerTwo = latestRoomState?.players.find((player) => player.playerNumber === 2);
 
-  // player 2 tank
-  drawTank(ctx, 672, 276, "#c95f4a", "left");
+if (myPlayerNumber === 1) {
+  drawTank(ctx, localTank.x, localTank.y, localTank.angle, "#6ca36c");
+
+  if (playerTwo?.tank) {
+    drawTank(ctx, playerTwo.tank.x, playerTwo.tank.y, playerTwo.tank.angle, "#c95f4a");
+  }
+}
+
+if (myPlayerNumber === 2) {
+  if (playerOne?.tank) {
+    drawTank(ctx, playerOne.tank.x, playerOne.tank.y, playerOne.tank.angle, "#6ca36c");
+  }
+
+  drawTank(ctx, localTank.x, localTank.y, localTank.angle, "#c95f4a");
+}
 
   // splash
   ctx.fillStyle = "#ffd28a";
@@ -171,19 +226,67 @@ function drawBattlefield() {
   ctx.textAlign = "left";
 }
 
-function drawTank(ctx, x, y, color, direction) {
+function drawTank(ctx, x, y, angle, color) {
+  ctx.save();
+  ctx.translate(x + 19, y + 14);
+  ctx.rotate(angle);
+
   ctx.fillStyle = color;
   ctx.strokeStyle = "#1b120d";
   ctx.lineWidth = 3;
 
-  ctx.fillRect(x, y, 38, 28);
-  ctx.strokeRect(x, y, 38, 28);
+  ctx.fillRect(-19, -14, 38, 28);
+  ctx.strokeRect(-19, -14, 38, 28);
 
   ctx.fillStyle = "#1b120d";
+  ctx.fillRect(8, -3, 28, 6);
 
-  if (direction === "right") {
-    ctx.fillRect(x + 28, y + 11, 28, 6);
-  } else {
-    ctx.fillRect(x - 18, y + 11, 28, 6);
+  ctx.restore();
+}
+
+function updateLocalTank() {
+  if (keys.a || keys.arrowleft) {
+    localTank.angle -= localTank.turnSpeed;
   }
+
+  if (keys.d || keys.arrowright) {
+    localTank.angle += localTank.turnSpeed;
+  }
+
+  let moveDirection = 0;
+
+  if (keys.w || keys.arrowup) {
+    moveDirection = 1;
+  }
+
+  if (keys.s || keys.arrowdown) {
+    moveDirection = -1;
+  }
+
+  if (moveDirection !== 0) {
+    localTank.x += Math.cos(localTank.angle) * localTank.speed * moveDirection;
+    localTank.y += Math.sin(localTank.angle) * localTank.speed * moveDirection;
+  }
+
+  localTank.x = Math.max(0, Math.min(922, localTank.x));
+  localTank.y = Math.max(0, Math.min(524, localTank.y));
+}
+
+function gameLoop() {
+  updateLocalTank();
+
+  const now = Date.now();
+
+  if (now - lastTankSendTime > 33) {
+    socket.emit("tankUpdate", {
+      x: localTank.x,
+      y: localTank.y,
+      angle: localTank.angle
+    });
+
+    lastTankSendTime = now;
+  }
+
+  drawBattlefield();
+  animationFrameId = requestAnimationFrame(gameLoop);
 }
