@@ -100,9 +100,90 @@ socket.on("gameStarting", () => {
     lobbyScreen.classList.add("hidden");
     gameScreen.classList.remove("hidden");
     gameRoomText.textContent = `Room ${currentRoomCode}`;
+    drawBattlefield();
   }, 800);
 });
 
 socket.on("joinError", (message) => {
   statusText.textContent = message;
 });
+
+function drawBattlefield() {
+  const canvas = document.getElementById("gameCanvas");
+
+  if (!canvas) {
+    return;
+  }
+
+  const ctx = canvas.getContext("2d");
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // grass
+  ctx.fillStyle = "#314022";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // road
+  ctx.fillStyle = "#5f5d54";
+  ctx.fillRect(0, 238, canvas.width, 82);
+
+  ctx.fillStyle = "#d7b36a";
+  for (let x = 0; x < canvas.width; x += 56) {
+    ctx.fillRect(x + 18, 276, 28, 6);
+  }
+
+  // left base
+  ctx.fillStyle = "#433326";
+  ctx.fillRect(34, 92, 170, 368);
+  ctx.strokeStyle = "#9b6a3a";
+  ctx.lineWidth = 8;
+  ctx.strokeRect(34, 92, 170, 368);
+
+  // right base
+  ctx.fillStyle = "#433326";
+  ctx.fillRect(756, 92, 170, 368);
+  ctx.strokeStyle = "#9b6a3a";
+  ctx.lineWidth = 8;
+  ctx.strokeRect(756, 92, 170, 368);
+
+  // labels
+  ctx.fillStyle = "#ffd28a";
+  ctx.font = "bold 18px Arial";
+  ctx.fillText("BASE A", 86, 286);
+  ctx.fillText("BASE B", 808, 286);
+
+  // player 1 tank
+  drawTank(ctx, 250, 276, "#6ca36c", "right");
+
+  // player 2 tank
+  drawTank(ctx, 672, 276, "#c95f4a", "left");
+
+  // splash
+  ctx.fillStyle = "#ffd28a";
+  ctx.font = "bold 34px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Player 1 vs Player 2", canvas.width / 2, 58);
+
+  ctx.fillStyle = "#ffe2b5";
+  ctx.font = "18px Arial";
+  ctx.fillText("Capture the enemy flag", canvas.width / 2, 86);
+
+  ctx.textAlign = "left";
+}
+
+function drawTank(ctx, x, y, color, direction) {
+  ctx.fillStyle = color;
+  ctx.strokeStyle = "#1b120d";
+  ctx.lineWidth = 3;
+
+  ctx.fillRect(x, y, 38, 28);
+  ctx.strokeRect(x, y, 38, 28);
+
+  ctx.fillStyle = "#1b120d";
+
+  if (direction === "right") {
+    ctx.fillRect(x + 28, y + 11, 28, 6);
+  } else {
+    ctx.fillRect(x - 18, y + 11, 28, 6);
+  }
+}
