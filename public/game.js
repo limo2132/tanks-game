@@ -29,13 +29,87 @@ let lastShotTime = 0;
 let lastMineTime = 0;
 let wasRespawning = false;
 
+const smoothedTanks = {};
+
 const keys = {};
 let animationFrameId = null;
 
-const world = {
-  width: 2400,
-  height: 1200
+const level = {
+  world: {
+    width: 2400,
+    height: 1200
+  },
+
+  road: {
+    x: 0,
+    y: 560,
+    width: 2400,
+    height: 96
+  },
+
+  spawns: {
+    blue: {
+      x: 170,
+      y: 610,
+      angle: 0
+    },
+
+    red: {
+      x: 2192,
+      y: 610,
+      angle: Math.PI
+    }
+  },
+
+  baseFloors: [
+    {
+      owner: 1,
+      x: 80,
+      y: 250,
+      width: 520,
+      height: 620
+    },
+
+    {
+      owner: 2,
+      x: 1800,
+      y: 250,
+      width: 520,
+      height: 620
+	}
+	],
+
+flags: {
+  blue: {
+    x: 260,
+    y: 500
+  },
+
+  red: {
+    x: 2140,
+    y: 500
+  }
+},
+hqs: [
+  {
+    owner: 1,
+    x: 140,
+    y: 700,
+    width: 78,
+    height: 86
+  },
+
+  {
+    owner: 2,
+    x: 2182,
+    y: 700,
+    width: 78,
+    height: 86
+  }
+]
 };
+
+const world = level.world;
 
 const camera = {
   x: 0,
@@ -43,9 +117,9 @@ const camera = {
 };
 
 const localTank = {
-  x: 250,
-  y: 276,
-  angle: 0,
+  x: level.spawns.blue.x,
+  y: level.spawns.blue.y,
+  angle: level.spawns.blue.angle,
   speed: 2.5,
   roadSpeed: 2.75,
   turnSpeed: 0.05
@@ -361,9 +435,12 @@ function tankCollisionBox(x, y) {
 }
 
 function isOnRoad(x, y) {
-  const centerY = y + 14;
-
-  return centerY >= 560 && centerY <= 656;
+  return (
+    x + 19 >= level.road.x &&
+    x + 19 <= level.road.x + level.road.width &&
+    y + 14 >= level.road.y &&
+    y + 14 <= level.road.y + level.road.height
+  );
 }
 
 function hitsCollisionBlock(x, y) {
@@ -424,17 +501,35 @@ ctx.fillRect(0, 0, canvas.width, canvas.height);
 
 // road
 ctx.fillStyle = "#5f5d54";
-ctx.fillRect(toScreenX(0), toScreenY(560), world.width, 96);
+ctx.fillRect(
+  toScreenX(level.road.x),
+  toScreenY(level.road.y),
+  level.road.width,
+  level.road.height
+);
 
-  ctx.fillStyle = "#d7b36a";
-for (let x = 0; x < world.width; x += 56) {
-ctx.fillRect(toScreenX(x + 18), toScreenY(605), 28, 6);
+ctx.fillStyle = "#d7b36a";
+for (let x = level.road.x; x < level.road.x + level.road.width; x += 56) {
+  ctx.fillRect(
+    toScreenX(x + 18),
+    toScreenY(level.road.y + 45),
+    28,
+    6
+  );
 }
+
 
 // base floors
 ctx.fillStyle = "#433326";
-ctx.fillRect(toScreenX(80), toScreenY(250), 520, 620);
-ctx.fillRect(toScreenX(1800), toScreenY(250), 520, 620);
+level.baseFloors.forEach((baseFloor) => {
+  ctx.fillRect(
+    toScreenX(baseFloor.x),
+    toScreenY(baseFloor.y),
+    baseFloor.width,
+    baseFloor.height
+  );
+});
+
 
 // base gates
 const currentGates = latestRoomState?.gates || gateBlocks;
@@ -503,17 +598,20 @@ if (myPlayerNumber === 1) {
   drawTank(ctx, localTank.x, localTank.y, localTank.angle, "#3f7fd9", playerOne?.health ?? 200);
 
   if (playerTwo?.tank && !playerTwo.respawnAt) {
-    drawTank(ctx, playerTwo.tank.x, playerTwo.tank.y, playerTwo.tank.angle, "#c95f4a", playerTwo.health);
+    const smoothPlayerTwo = getSmoothedTank(playerTwo);
+    drawTank(ctx, smoothPlayerTwo.x, smoothPlayerTwo.y, smoothPlayerTwo.angle, "#c95f4a", playerTwo.health);
   }
 }
 
 if (myPlayerNumber === 2) {
   if (playerOne?.tank && !playerOne.respawnAt) {
-    drawTank(ctx, playerOne.tank.x, playerOne.tank.y, playerOne.tank.angle, "#3f7fd9", playerOne.health);
+    const smoothPlayerOne = getSmoothedTank(playerOne);
+    drawTank(ctx, smoothPlayerOne.x, smoothPlayerOne.y, smoothPlayerOne.angle, "#3f7fd9", playerOne.health);
   }
 
   drawTank(ctx, localTank.x, localTank.y, localTank.angle, "#c95f4a", playerTwo?.health ?? 200);
 }
+
 
 if (latestRoomState?.bullets) {
   latestRoomState.bullets.forEach((bullet) => {
@@ -703,6 +801,30 @@ function drawWall(ctx, wall) {
     ctx.lineTo(x + 8, y + wall.height - 7);
     ctx.stroke();
   }
+}
+
+function getSmoothedTank(player) {
+  const tank = player.tank;
+
+  if (!smoothedTanks[player.id]) {
+    smoothedTanks[player.id] = {
+      x: tank.x,
+      y: tank.y,
+      angle: tank.angle
+    };
+  }
+
+  const smoothed = smoothedTanks[player.id];
+
+  smoothed.x += (tank.x - smoothed.x) * 0.25;
+  smoothed.y += (tank.y - smoothed.y) * 0.25;
+  smoothed.angle += (tank.angle - smoothed.angle) * 0.25;
+
+  return {
+    x: smoothed.x,
+    y: smoothed.y,
+    angle: smoothed.angle
+  };
 }
 
 function drawTank(ctx, x, y, angle, color, health) {

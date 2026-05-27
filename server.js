@@ -11,8 +11,122 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static("public"));
 
 const rooms = {};
-const WORLD_WIDTH = 2400;
-const WORLD_HEIGHT = 1200;
+
+const level = {
+  world: {
+    width: 2400,
+    height: 1200
+  },
+
+  road: {
+    x: 0,
+    y: 560,
+    width: 2400,
+    height: 96
+  },
+
+  spawns: {
+    blue: {
+      x: 170,
+      y: 610,
+      angle: 0
+    },
+
+    red: {
+      x: 2192,
+      y: 610,
+      angle: Math.PI
+    }
+  },
+
+  flags: {
+    blue: {
+      x: 485,
+      y: 500
+    },
+
+    red: {
+      x: 1915,
+      y: 500
+    }
+  },
+
+  hqs: [
+    {
+      owner: 1,
+      x: 140,
+      y: 700,
+      width: 78,
+      height: 86
+    },
+
+    {
+      owner: 2,
+      x: 2182,
+      y: 700,
+      width: 78,
+      height: 86
+    }
+  ],
+      gates: [
+    {
+      owner: 1,
+      x: 572,
+      y: 552,
+      width: 28,
+      height: 112
+    },
+
+    {
+      owner: 2,
+      x: 1800,
+      y: 552,
+      width: 28,
+      height: 112
+    }
+  ],
+
+  walls: [
+    // left outer walls
+    { x: 80, y: 250, width: 520, height: 28 },
+    { x: 80, y: 842, width: 520, height: 28 },
+    { x: 80, y: 250, width: 28, height: 620 },
+    { x: 572, y: 250, width: 28, height: 302 },
+    { x: 572, y: 664, width: 28, height: 206 },
+
+    // left flag room
+    { x: 405, y: 445, width: 150, height: 24 },
+    { x: 405, y: 535, width: 150, height: 24 },
+    { x: 405, y: 445, width: 24, height: 114 },
+    { x: 531, y: 445, width: 24, height: 48 },
+    { x: 531, y: 511, width: 24, height: 48 },
+
+    // left rear divider walls, do not block central lane
+    { x: 130, y: 660, width: 220, height: 24 },
+    { x: 360, y: 660, width: 24, height: 120 },
+
+    // right outer walls
+    { x: 1800, y: 250, width: 520, height: 28 },
+    { x: 1800, y: 842, width: 520, height: 28 },
+    { x: 2292, y: 250, width: 28, height: 620 },
+    { x: 1800, y: 250, width: 28, height: 302 },
+    { x: 1800, y: 664, width: 28, height: 206 },
+
+    // right flag room
+    { x: 1845, y: 445, width: 150, height: 24 },
+    { x: 1845, y: 535, width: 150, height: 24 },
+    { x: 1971, y: 445, width: 24, height: 114 },
+    { x: 1845, y: 445, width: 24, height: 48 },
+    { x: 1845, y: 511, width: 24, height: 48 },
+
+    // right rear divider walls, do not block central lane
+    { x: 2050, y: 660, width: 220, height: 24 },
+    { x: 2016, y: 660, width: 24, height: 120 }
+  ]
+};
+
+const WORLD_WIDTH = level.world.width;
+const WORLD_HEIGHT = level.world.height;
 
 let nextBulletId = 1;
 let nextExplosionId = 1;
@@ -50,58 +164,26 @@ function rectanglesOverlap(a, b) {
 }
 
 function getStartingWalls() {
-  return [
-    // left outer walls
-    { x: 80, y: 250, width: 520, height: 28, health: 150, destroyed: false },
-    { x: 80, y: 842, width: 520, height: 28, health: 150, destroyed: false },
-    { x: 80, y: 250, width: 28, height: 620, health: 150, destroyed: false },
-    { x: 572, y: 250, width: 28, height: 302, health: 150, destroyed: false },
-    { x: 572, y: 664, width: 28, height: 206, health: 150, destroyed: false },
-
-    // left flag room
-    { x: 405, y: 445, width: 150, height: 24, health: 150, destroyed: false },
-    { x: 405, y: 535, width: 150, height: 24, health: 150, destroyed: false },
-    { x: 405, y: 445, width: 24, height: 114, health: 150, destroyed: false },
-    { x: 531, y: 445, width: 24, height: 48, health: 150, destroyed: false },
-    { x: 531, y: 511, width: 24, height: 48, health: 150, destroyed: false },
-
-    // left rear divider walls, do not block central lane
-    { x: 130, y: 660, width: 220, height: 24, health: 150, destroyed: false },
-    { x: 360, y: 660, width: 24, height: 120, health: 150, destroyed: false },
-
-    // right outer walls
-    { x: 1800, y: 250, width: 520, height: 28, health: 150, destroyed: false },
-    { x: 1800, y: 842, width: 520, height: 28, health: 150, destroyed: false },
-    { x: 2292, y: 250, width: 28, height: 620, health: 150, destroyed: false },
-    { x: 1800, y: 250, width: 28, height: 302, health: 150, destroyed: false },
-    { x: 1800, y: 664, width: 28, height: 206, health: 150, destroyed: false },
-
-    // right flag room
-    { x: 1845, y: 445, width: 150, height: 24, health: 150, destroyed: false },
-    { x: 1845, y: 535, width: 150, height: 24, health: 150, destroyed: false },
-    { x: 1971, y: 445, width: 24, height: 114, health: 150, destroyed: false },
-    { x: 1845, y: 445, width: 24, height: 48, health: 150, destroyed: false },
-    { x: 1845, y: 511, width: 24, height: 48, health: 150, destroyed: false },
-
-    // right rear divider walls, do not block central lane
-    { x: 2050, y: 660, width: 220, height: 24, health: 150, destroyed: false },
-    { x: 2016, y: 660, width: 24, height: 120, health: 150, destroyed: false }
-  ];
+  return level.walls.map((wall) => ({
+    ...wall,
+    health: 150,
+    destroyed: false
+  }));
 }
 
 function getStartingFlags() {
   return [
     {
       owner: 1,
-      x: 485,
-      y: 500,
+      x: level.flags.blue.x,
+      y: level.flags.blue.y,
       status: "atBase",
       carrierId: null
     },
     {
       owner: 2,
-      x: 1915,
-      y: 500,
+      x: level.flags.red.x,
+      y: level.flags.red.y,
       status: "atBase",
       carrierId: null
     }
@@ -111,61 +193,31 @@ function getStartingFlags() {
 function getFlagBasePosition(owner) {
   if (owner === 1) {
     return {
-      x: 485,
-      y: 500
+      x: level.flags.blue.x,
+      y: level.flags.blue.y
     };
   }
 
   return {
-    x: 1915,
-    y: 500
+    x: level.flags.red.x,
+    y: level.flags.red.y
   };
 }
 
 function getStartingHeadquarters() {
-  return [
-    {
-      owner: 1,
-      x: 140,
-      y: 700,
-      width: 78,
-      height: 86,
-      health: 250,
-      destroyed: false
-    },
-    {
-      owner: 2,
-      x: 2182,
-      y: 700,
-      width: 78,
-      height: 86,
-      health: 250,
-      destroyed: false
-    }
-  ];
+  return level.hqs.map((hq) => ({
+    ...hq,
+    health: 250,
+    destroyed: false
+  }));
 }
 
 function getStartingGates() {
-  return [
-    {
-      x: 572,
-      y: 552,
-      width: 28,
-      height: 112,
-      owner: 1,
-      health: 100,
-      destroyed: false
-    },
-    {
-      x: 1800,
-      y: 552,
-      width: 28,
-      height: 112,
-      owner: 2,
-      health: 100,
-      destroyed: false
-    }
-  ];
+  return level.gates.map((gate) => ({
+    ...gate,
+    health: 100,
+    destroyed: false
+  }));
 }
 
 function addExplosion(room, x, y, size) {
@@ -183,16 +235,16 @@ function addExplosion(room, x, y, size) {
 function getSpawnForPlayer(playerNumber) {
   if (playerNumber === 1) {
     return {
-      x: 170,
-      y: 610,
-      angle: 0
+      x: level.spawns.blue.x,
+      y: level.spawns.blue.y,
+      angle: level.spawns.blue.angle
     };
   }
 
   return {
-    x: 2192,
-    y: 610,
-    angle: Math.PI
+    x: level.spawns.red.x,
+    y: level.spawns.red.y,
+    angle: level.spawns.red.angle
   };
 }
 
