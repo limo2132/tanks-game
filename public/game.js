@@ -17,6 +17,8 @@ const gameRoomText = document.getElementById("gameRoomText");
 const healthText = document.getElementById("healthText");
 const scoreText = document.getElementById("scoreText");
 const winnerBanner = document.getElementById("winnerBanner");
+const winnerText = document.getElementById("winnerText");
+const rematchButton = document.getElementById("rematchButton");
 
 let currentRoomCode = null;
 let isReady = false;
@@ -24,61 +26,150 @@ let myPlayerNumber = null;
 let latestRoomState = null;
 let lastTankSendTime = 0;
 let lastShotTime = 0;
+let lastMineTime = 0;
+let wasRespawning = false;
 
 const keys = {};
 let animationFrameId = null;
+
+const world = {
+  width: 2400,
+  height: 1200
+};
+
+const camera = {
+  x: 0,
+  y: 0
+};
 
 const localTank = {
   x: 250,
   y: 276,
   angle: 0,
   speed: 2.5,
+  roadSpeed: 2.75,
   turnSpeed: 0.05
 };
-const collisionBlocks = [
-  // left base walls
-  { x: 34, y: 92, width: 190, height: 24 },
-  { x: 34, y: 436, width: 190, height: 24 },
-  { x: 34, y: 92, width: 24, height: 368 },
-  { x: 200, y: 92, width: 24, height: 130 },
-  { x: 200, y: 330, width: 24, height: 130 },
 
-  // right base walls
-  { x: 736, y: 92, width: 190, height: 24 },
-  { x: 736, y: 436, width: 190, height: 24 },
-  { x: 902, y: 92, width: 24, height: 368 },
-  { x: 736, y: 92, width: 24, height: 130 },
-  { x: 736, y: 330, width: 24, height: 130 }
+const collisionBlocks = [
+  // left outer walls
+  { x: 80, y: 250, width: 520, height: 28 },
+  { x: 80, y: 842, width: 520, height: 28 },
+  { x: 80, y: 250, width: 28, height: 620 },
+  { x: 572, y: 250, width: 28, height: 302 },
+  { x: 572, y: 664, width: 28, height: 206 },
+
+  // left flag room
+  { x: 405, y: 445, width: 150, height: 24 },
+  { x: 405, y: 535, width: 150, height: 24 },
+  { x: 405, y: 445, width: 24, height: 114 },
+  { x: 531, y: 445, width: 24, height: 48 },
+  { x: 531, y: 511, width: 24, height: 48 },
+
+  // left rear divider walls, do not block central lane
+  { x: 130, y: 660, width: 220, height: 24 },
+  { x: 360, y: 660, width: 24, height: 120 },
+
+  // right outer walls
+  { x: 1800, y: 250, width: 520, height: 28 },
+  { x: 1800, y: 842, width: 520, height: 28 },
+  { x: 2292, y: 250, width: 28, height: 620 },
+  { x: 1800, y: 250, width: 28, height: 302 },
+  { x: 1800, y: 664, width: 28, height: 206 },
+
+  // right flag room
+  { x: 1845, y: 445, width: 150, height: 24 },
+  { x: 1845, y: 535, width: 150, height: 24 },
+  { x: 1971, y: 445, width: 24, height: 114 },
+  { x: 1845, y: 445, width: 24, height: 48 },
+  { x: 1845, y: 511, width: 24, height: 48 },
+
+  // right rear divider walls, do not block central lane
+  { x: 2050, y: 660, width: 220, height: 24 },
+  { x: 2016, y: 660, width: 24, height: 120 }
 ];
+
 const gateBlocks = [
   {
-    x: 200,
-    y: 222,
-    width: 24,
-    height: 108,
+    x: 572,
+    y: 552,
+    width: 28,
+    height: 112,
     owner: 1,
     health: 100
   },
   {
-    x: 736,
-    y: 222,
-    width: 24,
-    height: 108,
+    x: 1800,
+    y: 552,
+    width: 28,
+    height: 112,
     owner: 2,
     health: 100
   }
 ];
 
+const baseBuildings = [
+  // left base, upper supply area
+  { type: "ammo", owner: 1, x: 140, y: 330, width: 58, height: 38 },
+  { type: "ammo", owner: 1, x: 250, y: 330, width: 58, height: 38 },
+  { type: "fuel", owner: 1, x: 430, y: 330, width: 50, height: 58 },
+  { type: "fuel", owner: 1, x: 500, y: 330, width: 50, height: 58 },
+
+  // left base, lower support area
+  { type: "hospital", owner: 1, x: 250, y: 710, width: 82, height: 50 },
+  { type: "helipad", owner: 1, x: 400, y: 710, width: 92, height: 70 },
+  { type: "ammo", owner: 1, x: 500, y: 730, width: 58, height: 38 },
+
+  // left base turret positions
+  { type: "turret", owner: 1, x: 552, y: 292, width: 32, height: 32 },
+  { type: "turret", owner: 1, x: 552, y: 805, width: 32, height: 32 },
+  { type: "turret", owner: 1, x: 432, y: 475, width: 32, height: 32 },
+  { type: "turret", owner: 1, x: 432, y: 590, width: 32, height: 32 },
+
+  // right base, upper supply area
+  { type: "ammo", owner: 2, x: 2202, y: 330, width: 58, height: 38 },
+  { type: "ammo", owner: 2, x: 2092, y: 330, width: 58, height: 38 },
+  { type: "fuel", owner: 2, x: 1920, y: 330, width: 50, height: 58 },
+  { type: "fuel", owner: 2, x: 1850, y: 330, width: 50, height: 58 },
+
+  // right base, lower support area
+  { type: "hospital", owner: 2, x: 2068, y: 710, width: 82, height: 50 },
+  { type: "helipad", owner: 2, x: 1908, y: 710, width: 92, height: 70 },
+  { type: "ammo", owner: 2, x: 1842, y: 730, width: 58, height: 38 },
+
+  // right base turret positions
+  { type: "turret", owner: 2, x: 1816, y: 292, width: 32, height: 32 },
+  { type: "turret", owner: 2, x: 1816, y: 805, width: 32, height: 32 },
+  { type: "turret", owner: 2, x: 1936, y: 475, width: 32, height: 32 },
+  { type: "turret", owner: 2, x: 1936, y: 590, width: 32, height: 32 }
+];
+
+function updateCamera(canvas) {
+  camera.x = localTank.x + 19 - canvas.width / 2;
+  camera.y = localTank.y + 14 - canvas.height / 2;
+
+  camera.x = Math.max(0, Math.min(world.width - canvas.width, camera.x));
+  camera.y = Math.max(0, Math.min(world.height - canvas.height, camera.y));
+}
+
+function toScreenX(worldX) {
+  return worldX - camera.x;
+}
+
+function toScreenY(worldY) {
+  return worldY - camera.y;
+}
+
 function setStartingTankPosition() {
   if (myPlayerNumber === 1) {
-    localTank.x = 250;
-    localTank.y = 276;
+    localTank.x = 170;
+    localTank.y = 610;
     localTank.angle = 0;
   }
 
   if (myPlayerNumber === 2) {
-    localTank.x = 672;
-    localTank.y = 276;
+    localTank.x = 2192;
+    localTank.y = 610;
     localTank.angle = Math.PI;
   }
 }
@@ -134,6 +225,11 @@ readyButton.addEventListener("click", () => {
 backButton.addEventListener("click", () => {
   window.location.reload();
 });
+
+rematchButton.addEventListener("click", () => {
+  socket.emit("rematch");
+});
+
 copyRoomCodeButton.addEventListener("click", async () => {
   if (!currentRoomCode) {
     statusText.textContent = "No room code yet.";
@@ -159,6 +255,14 @@ window.addEventListener("keydown", (event) => {
       lastShotTime = now;
     }
   }
+  if (event.key === "Shift") {
+  const now = Date.now();
+
+  if (now - lastMineTime > 5000) {
+    socket.emit("placeMine");
+    lastMineTime = now;
+  }
+}
 });
 
 window.addEventListener("keyup", (event) => {
@@ -184,10 +288,18 @@ socket.on("roomState", (room) => {
 
   const me = room.players.find((player) => player.id === socket.id);
 
-  if (me) {
+if (me) {
   isReady = me.ready;
   myPlayerNumber = me.playerNumber;
   readyButton.textContent = isReady ? "Not Ready" : "Ready";
+
+  if (wasRespawning && !me.respawnAt && me.tank) {
+    localTank.x = me.tank.x;
+    localTank.y = me.tank.y;
+    localTank.angle = me.tank.angle;
+  }
+
+  wasRespawning = Boolean(me.respawnAt);
 
   if (healthText) {
     healthText.textContent = `Health ${me.health}/200`;
@@ -198,9 +310,9 @@ if (room.scores && scoreText) {
   scoreText.textContent = `Blue ${room.scores[1]} - Red ${room.scores[2]}`;
 }
 
-if (winnerBanner) {
+if (winnerBanner && winnerText) {
   if (room.winner) {
-    winnerBanner.textContent = room.winner === 1 ? "Blue wins!" : "Red wins!";
+    winnerText.textContent = room.winner === 1 ? "Blue wins!" : "Red wins!";
     winnerBanner.classList.remove("hidden");
   } else {
     winnerBanner.classList.add("hidden");
@@ -248,6 +360,12 @@ function tankCollisionBox(x, y) {
   };
 }
 
+function isOnRoad(x, y) {
+  const centerY = y + 14;
+
+  return centerY >= 560 && centerY <= 656;
+}
+
 function hitsCollisionBlock(x, y) {
   const box = tankCollisionBox(x, y);
 
@@ -271,12 +389,14 @@ const hitsEnemyGate = currentGates.some((gate) => {
   return !gate.destroyed && !isOwnGate && rectanglesOverlap(box, gate);
 });
 
-  const opponent = latestRoomState?.players.find((player) => {
-    return player.playerNumber !== myPlayerNumber;
-  });
+const opponent = latestRoomState?.players.find((player) => {
+  return player.playerNumber !== myPlayerNumber;
+});
 
-  const hitsOpponent =
-    opponent?.tank && rectanglesOverlap(box, tankCollisionBox(opponent.tank.x, opponent.tank.y));
+const hitsOpponent =
+  opponent?.tank &&
+  !opponent.respawnAt &&
+  rectanglesOverlap(box, tankCollisionBox(opponent.tank.x, opponent.tank.y));
 
   return hitsWall || hitsHeadquarters || hitsEnemyGate || hitsOpponent;
 }
@@ -292,27 +412,29 @@ function drawBattlefield() {
     return;
   }
 
-  const ctx = canvas.getContext("2d");
+const ctx = canvas.getContext("2d");
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+updateCamera(canvas);
 
-  // grass
-  ctx.fillStyle = "#314022";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // road
-  ctx.fillStyle = "#5f5d54";
-  ctx.fillRect(0, 238, canvas.width, 82);
+// grass
+ctx.fillStyle = "#314022";
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+// road
+ctx.fillStyle = "#5f5d54";
+ctx.fillRect(toScreenX(0), toScreenY(560), world.width, 96);
 
   ctx.fillStyle = "#d7b36a";
-  for (let x = 0; x < canvas.width; x += 56) {
-    ctx.fillRect(x + 18, 276, 28, 6);
-  }
+for (let x = 0; x < world.width; x += 56) {
+ctx.fillRect(toScreenX(x + 18), toScreenY(605), 28, 6);
+}
 
 // base floors
 ctx.fillStyle = "#433326";
-ctx.fillRect(34, 92, 190, 368);
-ctx.fillRect(736, 92, 190, 368);
+ctx.fillRect(toScreenX(80), toScreenY(250), 520, 620);
+ctx.fillRect(toScreenX(1800), toScreenY(250), 520, 620);
 
 // base gates
 const currentGates = latestRoomState?.gates || gateBlocks;
@@ -322,21 +444,28 @@ currentGates.forEach((gate) => {
     return;
   }
 
+  const x = toScreenX(gate.x);
+  const y = toScreenY(gate.y);
   const isOwnGate = gate.owner === myPlayerNumber;
   const healthPercent = gate.health / 100;
 
   ctx.fillStyle = isOwnGate ? "#2f6f4e" : "#8b3f2f";
-  ctx.fillRect(gate.x, gate.y, gate.width, gate.height);
+  ctx.fillRect(x, y, gate.width, gate.height);
 
   ctx.strokeStyle = isOwnGate ? "#77d09a" : "#d9973f";
   ctx.lineWidth = 3;
-  ctx.strokeRect(gate.x, gate.y, gate.width, gate.height);
+  ctx.strokeRect(x, y, gate.width, gate.height);
 
   ctx.fillStyle = "#1b120d";
-  ctx.fillRect(gate.x - 8, gate.y - 10, gate.width + 16, 5);
+  ctx.fillRect(x - 8, y - 10, gate.width + 16, 5);
 
   ctx.fillStyle = "#ffd28a";
-  ctx.fillRect(gate.x - 8, gate.y - 10, (gate.width + 16) * healthPercent, 5);
+  ctx.fillRect(x - 8, y - 10, (gate.width + 16) * healthPercent, 5);
+});
+
+// base buildings
+baseBuildings.forEach((building) => {
+  drawBaseBuilding(ctx, building);
 });
 
 // headquarters
@@ -360,6 +489,12 @@ currentWalls.forEach((wall) => {
 
   drawWall(ctx, wall);
 });
+
+if (latestRoomState?.mines) {
+  latestRoomState.mines.forEach((mine) => {
+    drawMine(ctx, mine);
+  });
+}
 
 const playerOne = latestRoomState?.players.find((player) => player.playerNumber === 1);
 const playerTwo = latestRoomState?.players.find((player) => player.playerNumber === 2);
@@ -411,96 +546,171 @@ if (latestRoomState?.explosions) {
   ctx.textAlign = "left";
 }
 
+function drawBaseBuilding(ctx, building) {
+  const x = toScreenX(building.x);
+  const y = toScreenY(building.y);
+
+  if (building.type === "ammo") {
+    ctx.fillStyle = "#5b5f6a";
+  } else if (building.type === "fuel") {
+    ctx.fillStyle = "#8b3f2f";
+  } else if (building.type === "hospital") {
+    ctx.fillStyle = "#f0e4cf";
+  } else if (building.type === "helipad") {
+    ctx.fillStyle = "#4f5f64";
+  } else {
+    ctx.fillStyle = "#2b2520";
+  }
+
+  ctx.fillRect(x, y, building.width, building.height);
+
+  ctx.strokeStyle = "#1b120d";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, building.width, building.height);
+
+  ctx.fillStyle = "#ffd28a";
+  ctx.font = "bold 12px Arial";
+
+  if (building.type === "ammo") {
+    ctx.fillText("AM", x + 14, y + 22);
+  }
+
+  if (building.type === "fuel") {
+    ctx.fillText("F", x + 17, y + 29);
+  }
+
+  if (building.type === "hospital") {
+    ctx.fillStyle = "#d95745";
+    ctx.fillRect(x + 30, y + 10, 10, 24);
+    ctx.fillRect(x + 23, y + 17, 24, 10);
+  }
+
+  if (building.type === "helipad") {
+    ctx.strokeStyle = "#ffd28a";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x + building.width / 2, y + building.height / 2, 18, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = "#ffd28a";
+    ctx.font = "bold 16px Arial";
+    ctx.fillText("H", x + 30, y + 32);
+  }
+
+  if (building.type === "turret") {
+    ctx.fillStyle = building.owner === 1 ? "#3f7fd9" : "#c95f4a";
+    ctx.beginPath();
+    ctx.arc(x + 12, y + 12, 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "#1b120d";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = "#1b120d";
+    ctx.fillRect(x + 12, y + 9, 18, 6);
+  }
+}
+
 function drawHeadquarters(ctx, hq) {
-const bodyColor = hq.owner === 1 ? "#274f8f" : "#8b3f2f";
-const roofColor = hq.owner === 1 ? "#3f7fd9" : "#c95f4a";
+  const x = toScreenX(hq.x);
+  const y = toScreenY(hq.y);
 
-ctx.fillStyle = bodyColor;
-ctx.fillRect(hq.x, hq.y, hq.width, hq.height);
+  const bodyColor = hq.owner === 1 ? "#274f8f" : "#8b3f2f";
+  const roofColor = hq.owner === 1 ? "#3f7fd9" : "#c95f4a";
 
-ctx.fillStyle = roofColor;
-ctx.fillRect(hq.x + 8, hq.y + 8, hq.width - 16, 18);
+  ctx.fillStyle = bodyColor;
+  ctx.fillRect(x, y, hq.width, hq.height);
 
-ctx.fillStyle = "#1b120d";
-ctx.fillRect(hq.x + 20, hq.y + hq.height - 22, hq.width - 40, 22);
+  ctx.fillStyle = roofColor;
+  ctx.fillRect(x + 8, y + 8, hq.width - 16, 18);
 
-ctx.strokeStyle = "#ffd28a";
-ctx.lineWidth = 3;
-ctx.strokeRect(hq.x, hq.y, hq.width, hq.height);
+  ctx.fillStyle = "#1b120d";
+  ctx.fillRect(x + 20, y + hq.height - 22, hq.width - 40, 22);
 
-ctx.strokeStyle = "#1b120d";
-ctx.lineWidth = 2;
-ctx.strokeRect(hq.x + 8, hq.y + 8, hq.width - 16, 18);
+  ctx.strokeStyle = "#ffd28a";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(x, y, hq.width, hq.height);
+
+  ctx.strokeStyle = "#1b120d";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 8, y + 8, hq.width - 16, 18);
 
   if (hq.health < 250) {
     const healthPercent = hq.health / 250;
 
     ctx.fillStyle = "#1b120d";
-    ctx.fillRect(hq.x, hq.y - 8, hq.width, 5);
+    ctx.fillRect(x, y - 8, hq.width, 5);
 
     ctx.fillStyle = "#ffd28a";
-    ctx.fillRect(hq.x, hq.y - 8, hq.width * healthPercent, 5);
+    ctx.fillRect(x, y - 8, hq.width * healthPercent, 5);
   }
 
   if (hq.health < 160) {
     ctx.strokeStyle = "#1b120d";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(hq.x + 8, hq.y + 8);
-    ctx.lineTo(hq.x + hq.width - 8, hq.y + hq.height - 8);
+    ctx.moveTo(x + 8, y + 8);
+    ctx.lineTo(x + hq.width - 8, y + hq.height - 8);
     ctx.stroke();
   }
 
   if (hq.health < 80) {
     ctx.beginPath();
-    ctx.moveTo(hq.x + hq.width - 8, hq.y + 10);
-    ctx.lineTo(hq.x + 10, hq.y + hq.height - 8);
+    ctx.moveTo(x + hq.width - 8, y + 10);
+    ctx.lineTo(x + 10, y + hq.height - 8);
     ctx.stroke();
   }
 }
 
 function drawWall(ctx, wall) {
+  const x = toScreenX(wall.x);
+  const y = toScreenY(wall.y);
+
   ctx.fillStyle = "#6f5944";
-  ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+  ctx.fillRect(x, y, wall.width, wall.height);
 
   ctx.strokeStyle = "#c98a42";
   ctx.lineWidth = 3;
-  ctx.strokeRect(wall.x, wall.y, wall.width, wall.height);
+  ctx.strokeRect(x, y, wall.width, wall.height);
 
   ctx.strokeStyle = "#24150e";
   ctx.lineWidth = 2;
-  ctx.strokeRect(wall.x + 5, wall.y + 5, wall.width - 10, wall.height - 10);
+  ctx.strokeRect(x + 5, y + 5, wall.width - 10, wall.height - 10);
 
   if (wall.health < 150) {
     const healthPercent = wall.health / 150;
 
     ctx.fillStyle = "#1b120d";
-    ctx.fillRect(wall.x, wall.y - 8, wall.width, 5);
+    ctx.fillRect(x, y - 8, wall.width, 5);
 
     ctx.fillStyle = "#ffd28a";
-    ctx.fillRect(wall.x, wall.y - 8, wall.width * healthPercent, 5);
+    ctx.fillRect(x, y - 8, wall.width * healthPercent, 5);
   }
 
   if (wall.health < 100) {
     ctx.strokeStyle = "#24150e";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(wall.x + 6, wall.y + 6);
-    ctx.lineTo(wall.x + wall.width - 8, wall.y + wall.height - 8);
+    ctx.moveTo(x + 6, y + 6);
+    ctx.lineTo(x + wall.width - 8, y + wall.height - 8);
     ctx.stroke();
   }
 
   if (wall.health < 50) {
     ctx.beginPath();
-    ctx.moveTo(wall.x + wall.width - 8, wall.y + 7);
-    ctx.lineTo(wall.x + 8, wall.y + wall.height - 7);
+    ctx.moveTo(x + wall.width - 8, y + 7);
+    ctx.lineTo(x + 8, y + wall.height - 7);
     ctx.stroke();
   }
 }
 
 function drawTank(ctx, x, y, angle, color, health) {
+  const screenX = toScreenX(x);
+  const screenY = toScreenY(y);
+
   ctx.save();
-  ctx.translate(x + 19, y + 14);
+  ctx.translate(screenX + 19, screenY + 14);
   ctx.rotate(angle);
 
   ctx.fillStyle = color;
@@ -520,7 +730,7 @@ function drawTank(ctx, x, y, angle, color, health) {
   const filledWidth = barWidth * healthPercent;
 
   ctx.fillStyle = "#1b120d";
-  ctx.fillRect(x - 2, y - 12, barWidth, 6);
+  ctx.fillRect(screenX - 2, screenY - 12, barWidth, 6);
 
   if (health > 140) {
     ctx.fillStyle = "#7bd86f";
@@ -530,7 +740,7 @@ function drawTank(ctx, x, y, angle, color, health) {
     ctx.fillStyle = "#d95745";
   }
 
-  ctx.fillRect(x - 2, y - 12, filledWidth, 6);
+  ctx.fillRect(screenX - 2, screenY - 12, filledWidth, 6);
 }
 
 function updateLocalTank() {
@@ -553,9 +763,13 @@ function updateLocalTank() {
   }
 
 if (moveDirection !== 0) {
-  const nextX = localTank.x + Math.cos(localTank.angle) * localTank.speed * moveDirection;
-  const nextY = localTank.y + Math.sin(localTank.angle) * localTank.speed * moveDirection;
+  const currentSpeed = isOnRoad(localTank.x, localTank.y)
+    ? localTank.roadSpeed
+    : localTank.speed;
 
+  const nextX = localTank.x + Math.cos(localTank.angle) * currentSpeed * moveDirection;
+  const nextY = localTank.y + Math.sin(localTank.angle) * currentSpeed * moveDirection;
+  
   if (!hitsCollisionBlock(nextX, localTank.y)) {
     localTank.x = nextX;
   }
@@ -565,8 +779,8 @@ if (moveDirection !== 0) {
   }
 }
 
-  localTank.x = Math.max(0, Math.min(922, localTank.x));
-  localTank.y = Math.max(0, Math.min(524, localTank.y));
+localTank.x = Math.max(0, Math.min(world.width - 38, localTank.x));
+localTank.y = Math.max(0, Math.min(world.height - 28, localTank.y));
 }
 
 function gameLoop() {
@@ -594,9 +808,12 @@ function gameLoop() {
 }
 
 function drawBullet(ctx, x, y) {
+  const screenX = toScreenX(x);
+  const screenY = toScreenY(y);
+
   ctx.fillStyle = "#ffd28a";
   ctx.beginPath();
-  ctx.arc(x, y, 5, 0, Math.PI * 2);
+  ctx.arc(screenX, screenY, 5, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.strokeStyle = "#1b120d";
@@ -604,7 +821,28 @@ function drawBullet(ctx, x, y) {
   ctx.stroke();
 }
 
+function drawMine(ctx, mine) {
+  const x = toScreenX(mine.x);
+  const y = toScreenY(mine.y);
+  const isArmed = Date.now() >= mine.armedAt;
+
+  ctx.fillStyle = isArmed ? "#d95745" : "#ffd28a";
+  ctx.beginPath();
+  ctx.arc(x, y, 8, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "#1b120d";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = "#1b120d";
+  ctx.fillRect(x - 4, y - 1, 8, 2);
+  ctx.fillRect(x - 1, y - 4, 2, 8);
+}
+
 function drawExplosion(ctx, explosion) {
+  const x = toScreenX(explosion.x);
+  const y = toScreenY(explosion.y);
   const age = Math.max(0, Date.now() - explosion.createdAt);
   const progress = Math.min(age / 700, 1);
   const radius = Math.max(1, explosion.size * progress);
@@ -612,45 +850,47 @@ function drawExplosion(ctx, explosion) {
 
   ctx.fillStyle = `rgba(255, 210, 80, ${alpha})`;
   ctx.beginPath();
-  ctx.arc(explosion.x, explosion.y, radius, 0, Math.PI * 2);
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.fillStyle = `rgba(217, 87, 69, ${alpha})`;
   ctx.beginPath();
-  ctx.arc(explosion.x, explosion.y, radius * 0.55, 0, Math.PI * 2);
+  ctx.arc(x, y, radius * 0.55, 0, Math.PI * 2);
   ctx.fill();
 }
 
 function drawFlag(ctx, flag) {
+  const x = toScreenX(flag.x);
+  const y = toScreenY(flag.y);
   const color = flag.owner === 1 ? "#3f7fd9" : "#c95f4a";
 
   if (flag.status === "atBase") {
     ctx.fillStyle = "#1b120d";
-    ctx.fillRect(flag.x - 10, flag.y + 12, 20, 6);
+    ctx.fillRect(x - 10, y + 12, 20, 6);
 
     ctx.strokeStyle = "#ffd28a";
     ctx.lineWidth = 2;
-    ctx.strokeRect(flag.x - 10, flag.y + 12, 20, 6);
+    ctx.strokeRect(x - 10, y + 12, 20, 6);
   }
 
   ctx.strokeStyle = "#1b120d";
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(flag.x, flag.y + 12);
-  ctx.lineTo(flag.x, flag.y - 14);
+  ctx.moveTo(x, y + 12);
+  ctx.lineTo(x, y - 14);
   ctx.stroke();
 
   ctx.fillStyle = color;
-  ctx.fillRect(flag.x, flag.y - 14, 18, 12);
+  ctx.fillRect(x, y - 14, 18, 12);
 
   ctx.strokeStyle = "#1b120d";
   ctx.lineWidth = 2;
-  ctx.strokeRect(flag.x, flag.y - 14, 18, 12);
+  ctx.strokeRect(x, y - 14, 18, 12);
 
   if (flag.status === "dropped") {
     ctx.fillStyle = "#ffd28a";
     ctx.beginPath();
-    ctx.arc(flag.x, flag.y + 16, 4, 0, Math.PI * 2);
+    ctx.arc(x, y + 16, 4, 0, Math.PI * 2);
     ctx.fill();
   }
 }

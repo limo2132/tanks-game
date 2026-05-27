@@ -11,8 +11,12 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static("public"));
 
 const rooms = {};
+const WORLD_WIDTH = 2400;
+const WORLD_HEIGHT = 1200;
+
 let nextBulletId = 1;
 let nextExplosionId = 1;
+let nextMineId = 1;
 
 function makeRoomCode() {
   return Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -47,19 +51,41 @@ function rectanglesOverlap(a, b) {
 
 function getStartingWalls() {
   return [
-    // left base walls
-    { x: 34, y: 92, width: 190, height: 24, health: 150, destroyed: false },
-    { x: 34, y: 436, width: 190, height: 24, health: 150, destroyed: false },
-    { x: 34, y: 92, width: 24, height: 368, health: 150, destroyed: false },
-    { x: 200, y: 92, width: 24, height: 130, health: 150, destroyed: false },
-    { x: 200, y: 330, width: 24, height: 130, health: 150, destroyed: false },
+    // left outer walls
+    { x: 80, y: 250, width: 520, height: 28, health: 150, destroyed: false },
+    { x: 80, y: 842, width: 520, height: 28, health: 150, destroyed: false },
+    { x: 80, y: 250, width: 28, height: 620, health: 150, destroyed: false },
+    { x: 572, y: 250, width: 28, height: 302, health: 150, destroyed: false },
+    { x: 572, y: 664, width: 28, height: 206, health: 150, destroyed: false },
 
-    // right base walls
-    { x: 736, y: 92, width: 190, height: 24, health: 150, destroyed: false },
-    { x: 736, y: 436, width: 190, height: 24, health: 150, destroyed: false },
-    { x: 902, y: 92, width: 24, height: 368, health: 150, destroyed: false },
-    { x: 736, y: 92, width: 24, height: 130, health: 150, destroyed: false },
-    { x: 736, y: 330, width: 24, height: 130, health: 150, destroyed: false }
+    // left flag room
+    { x: 405, y: 445, width: 150, height: 24, health: 150, destroyed: false },
+    { x: 405, y: 535, width: 150, height: 24, health: 150, destroyed: false },
+    { x: 405, y: 445, width: 24, height: 114, health: 150, destroyed: false },
+    { x: 531, y: 445, width: 24, height: 48, health: 150, destroyed: false },
+    { x: 531, y: 511, width: 24, height: 48, health: 150, destroyed: false },
+
+    // left rear divider walls, do not block central lane
+    { x: 130, y: 660, width: 220, height: 24, health: 150, destroyed: false },
+    { x: 360, y: 660, width: 24, height: 120, health: 150, destroyed: false },
+
+    // right outer walls
+    { x: 1800, y: 250, width: 520, height: 28, health: 150, destroyed: false },
+    { x: 1800, y: 842, width: 520, height: 28, health: 150, destroyed: false },
+    { x: 2292, y: 250, width: 28, height: 620, health: 150, destroyed: false },
+    { x: 1800, y: 250, width: 28, height: 302, health: 150, destroyed: false },
+    { x: 1800, y: 664, width: 28, height: 206, health: 150, destroyed: false },
+
+    // right flag room
+    { x: 1845, y: 445, width: 150, height: 24, health: 150, destroyed: false },
+    { x: 1845, y: 535, width: 150, height: 24, health: 150, destroyed: false },
+    { x: 1971, y: 445, width: 24, height: 114, health: 150, destroyed: false },
+    { x: 1845, y: 445, width: 24, height: 48, health: 150, destroyed: false },
+    { x: 1845, y: 511, width: 24, height: 48, health: 150, destroyed: false },
+
+    // right rear divider walls, do not block central lane
+    { x: 2050, y: 660, width: 220, height: 24, health: 150, destroyed: false },
+    { x: 2016, y: 660, width: 24, height: 120, health: 150, destroyed: false }
   ];
 }
 
@@ -67,15 +93,15 @@ function getStartingFlags() {
   return [
     {
       owner: 1,
-      x: 154,
-      y: 276,
+      x: 485,
+      y: 500,
       status: "atBase",
       carrierId: null
     },
     {
       owner: 2,
-      x: 806,
-      y: 276,
+      x: 1915,
+      y: 500,
       status: "atBase",
       carrierId: null
     }
@@ -85,14 +111,14 @@ function getStartingFlags() {
 function getFlagBasePosition(owner) {
   if (owner === 1) {
     return {
-      x: 154,
-      y: 276
+      x: 485,
+      y: 500
     };
   }
 
   return {
-    x: 806,
-    y: 276
+    x: 1915,
+    y: 500
   };
 }
 
@@ -100,19 +126,19 @@ function getStartingHeadquarters() {
   return [
     {
       owner: 1,
-      x: 82,
-      y: 238,
-      width: 58,
-      height: 76,
+      x: 140,
+      y: 700,
+      width: 78,
+      height: 86,
       health: 250,
       destroyed: false
     },
     {
       owner: 2,
-      x: 820,
-      y: 238,
-      width: 58,
-      height: 76,
+      x: 2182,
+      y: 700,
+      width: 78,
+      height: 86,
       health: 250,
       destroyed: false
     }
@@ -122,19 +148,19 @@ function getStartingHeadquarters() {
 function getStartingGates() {
   return [
     {
-      x: 200,
-      y: 222,
-      width: 24,
-      height: 108,
+      x: 572,
+      y: 552,
+      width: 28,
+      height: 112,
       owner: 1,
       health: 100,
       destroyed: false
     },
     {
-      x: 736,
-      y: 222,
-      width: 24,
-      height: 108,
+      x: 1800,
+      y: 552,
+      width: 28,
+      height: 112,
       owner: 2,
       health: 100,
       destroyed: false
@@ -157,15 +183,15 @@ function addExplosion(room, x, y, size) {
 function getSpawnForPlayer(playerNumber) {
   if (playerNumber === 1) {
     return {
-      x: 250,
-      y: 276,
+      x: 170,
+      y: 610,
       angle: 0
     };
   }
 
   return {
-    x: 672,
-    y: 276,
+    x: 2192,
+    y: 610,
     angle: Math.PI
   };
 }
@@ -184,6 +210,7 @@ players: room.players.map((player) => ({
   tank: player.tank
 })),
 bullets: room.bullets,
+mines: room.mines,
 gates: room.gates,
 walls: room.walls,
 headquarters: room.headquarters,
@@ -211,14 +238,11 @@ rooms[roomCode] = {
       ready: false,
       health: 200,
       respawnAt: null,
-      tank: {
-        x: 250,
-        y: 276,
-        angle: 0
-      }
+	  tank: getSpawnForPlayer(1)
     }
   ],
 bullets: [],
+mines: [],
 gates: getStartingGates(),
 walls: getStartingWalls(),
 headquarters: getStartingHeadquarters(),
@@ -258,11 +282,7 @@ room.players.push({
   ready: false,
   health: 200,
   respawnAt: null,
-  tank: {
-    x: 672,
-    y: 276,
-    angle: Math.PI
-  }
+  tank: getSpawnForPlayer(2)
 });
 
     socket.join(roomCode);
@@ -271,6 +291,42 @@ room.players.push({
     io.to(roomCode).emit("bothPlayersJoined", roomCode);
     io.to(roomCode).emit("roomState", getRoomState(roomCode));
   });
+
+socket.on("placeMine", () => {
+  const roomCode = socket.data.roomCode;
+  const room = rooms[roomCode];
+
+  if (!room) {
+    return;
+  }
+
+  const player = room.players.find((player) => player.id === socket.id);
+
+  if (!player || !player.tank || player.respawnAt) {
+    return;
+  }
+
+  const activePlayerMines = room.mines.filter((mine) => {
+    return mine.ownerId === socket.id;
+  });
+
+  if (activePlayerMines.length >= 3) {
+    return;
+  }
+
+  room.mines.push({
+    id: nextMineId,
+    ownerId: socket.id,
+    x: player.tank.x + 19 - Math.cos(player.tank.angle) * 34,
+    y: player.tank.y + 14 - Math.sin(player.tank.angle) * 34,
+    armedAt: Date.now() + 1000,
+    createdAt: Date.now()
+  });
+
+  nextMineId += 1;
+
+  io.to(roomCode).emit("roomState", getRoomState(roomCode));
+});
 
 socket.on("shoot", () => {
   const roomCode = socket.data.roomCode;
@@ -309,7 +365,7 @@ socket.on("tankUpdate", (tank) => {
 
   const player = room.players.find((player) => player.id === socket.id);
 
-  if (!player) {
+  if (!player || player.respawnAt) {
     return;
   }
 
@@ -320,6 +376,37 @@ socket.on("tankUpdate", (tank) => {
   };
 
   io.to(roomCode).emit("roomState", getRoomState(roomCode));
+});
+
+socket.on("rematch", () => {
+  const roomCode = socket.data.roomCode;
+  const room = rooms[roomCode];
+
+  if (!room) {
+    return;
+  }
+
+  room.players.forEach((player) => {
+    player.health = 200;
+    player.respawnAt = null;
+    player.ready = true;
+    player.tank = getSpawnForPlayer(player.playerNumber);
+  });
+
+  room.bullets = [];
+  room.gates = getStartingGates();
+  room.walls = getStartingWalls();
+  room.headquarters = getStartingHeadquarters();
+  room.flags = getStartingFlags();
+  room.scores = {
+    1: 0,
+    2: 0
+  };
+  room.winner = null;
+  room.explosions = [];
+
+  io.to(roomCode).emit("roomState", getRoomState(roomCode));
+  io.to(roomCode).emit("gameStarting");
 });
 
   socket.on("toggleReady", () => {
@@ -489,6 +576,68 @@ room.explosions = room.explosions.filter((explosion) => {
   return now - explosion.createdAt < 700;
 });
 
+const remainingMines = [];
+
+room.mines.forEach((mine) => {
+  const isArmed = now >= mine.armedAt;
+  const isExpired = now - mine.createdAt > 30000;
+
+  if (isExpired) {
+    return;
+  }
+
+  if (!isArmed) {
+    remainingMines.push(mine);
+    return;
+  }
+
+  const mineBox = {
+    x: mine.x - 14,
+    y: mine.y - 14,
+    width: 28,
+    height: 28
+  };
+
+  const hitPlayer = room.players.find((player) => {
+    if (player.id === mine.ownerId) {
+      return false;
+    }
+
+    if (player.respawnAt) {
+      return false;
+    }
+
+    return rectanglesOverlap(mineBox, tankBox(player.tank));
+  });
+
+  if (hitPlayer) {
+    hitPlayer.health -= 70;
+    addExplosion(room, mine.x, mine.y, 62);
+
+    if (hitPlayer.health <= 0) {
+      hitPlayer.health = 0;
+
+      room.flags.forEach((flag) => {
+        if (flag.carrierId === hitPlayer.id) {
+          flag.status = "dropped";
+          flag.carrierId = null;
+          flag.x = hitPlayer.tank.x + 19;
+          flag.y = hitPlayer.tank.y + 14;
+        }
+      });
+
+      hitPlayer.respawnAt = now + 3000;
+      hitPlayer.tank = getSpawnForPlayer(hitPlayer.playerNumber);
+    }
+
+    return;
+  }
+
+  remainingMines.push(mine);
+});
+
+room.mines = remainingMines;
+
 const nextBullets = [];
 
 room.bullets.forEach((bullet) => {
@@ -499,10 +648,10 @@ room.bullets.forEach((bullet) => {
   };
 
   const isInBounds =
-    nextBullet.x >= 0 &&
-    nextBullet.x <= 960 &&
-    nextBullet.y >= 0 &&
-    nextBullet.y <= 552;
+nextBullet.x >= 0 &&
+nextBullet.x <= WORLD_WIDTH &&
+nextBullet.y >= 0 &&
+nextBullet.y <= WORLD_HEIGHT;
 
   const isNotTooOld = now - nextBullet.createdAt < 1000;
 
